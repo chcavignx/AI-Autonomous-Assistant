@@ -55,19 +55,26 @@ Develop an embedded AI assistant that operates **entirely locally** on a Raspber
 
 ## Installation
 
-1. **Clone the repository**
+#### 1. **Clone the repository**
+```bash
 git clone https://github.com/chcavignx/AI-Autonomous-Assistant.git
-
 cd AI-Autonomous-Assistant
+```
 
-2. **Install dependencies**
-    For example: pip install -r requirements.txt
-3. **Hardware and Software Configuration**
+#### 2. **Install dependencies**
+Install Python packages:
+```bash
+pip install -r requirements.txt
+```
+#### 3. **Hardware and Software Configuration**
     - (Specify the necessary connections and any hardware-specific steps)
     - *Example: Connect the official camera, USB microphone, SSD NVMe, AI accelerator Hailo-8L, etc.*
 
-4. **Launching the Assistant**
-    - Example: python main.py
+#### 4. **Launching the Assistant**
+    - Example: 
+```bash
+python main.py
+```
 
 ## Usage
 TODO
