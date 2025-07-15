@@ -66,6 +66,7 @@ Install Python packages:
 ```bash
 pip install -r requirements.txt
 ```
+
 #### 3. **Hardware and Software Configuration**
     - (Specify the necessary connections and any hardware-specific steps)
     - *Example: Connect the official camera, USB microphone, SSD NVMe, AI accelerator Hailo-8L, etc.*
