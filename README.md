@@ -43,7 +43,8 @@ Develop an embedded AI assistant that operates **entirely locally** on a Raspber
 | **Object Recognition**        | 80–90%                  | 2–5 FPS on Pi alone, up to 25 FPS (with Hailo-8L)| Accuracy decreases for similar objects and crowded scenes                 |
 | **Offline Voice Recognition** | 85–95%                  | < 1 s, 2–5 s for longer phrases                  | Noise, accents, and command complexity can impact accuracy                |
 | **Offline Speech Synthesis**  | Natural voice           | Real-time or near real-time                      | Expressive/multilingual voices require more resources; quality depends on the vocal model |
-**Example Criteria**:
+
+###Example Criteria###
 - Short commands, limited vocabulary, latency under 1 s
 - Natural voice (FR/EN), immediate response
 - Reliable recognition of 2–5 individuals
@@ -54,15 +55,16 @@ Develop an embedded AI assistant that operates **entirely locally** on a Raspber
 
 1. **Clone the repository**
     git clone https://github.com/chcavignx/AI-Autonomous-Assistant.git
+    
     cd AI-Autonomous-Assistant
 
 2. **Install dependencies**
     For example: pip install -r requirements.txt
-    3. **Hardware and Software Configuration**
+3. **Hardware and Software Configuration**
     - (Specify the necessary connections and any hardware-specific steps)
     - *Example: Connect the official camera, USB microphone, SSD NVMe, AI accelerator Hailo-8L, etc.*
 
-    4. **Launching the Assistant**
+4. **Launching the Assistant**
     - Example: python main.py
 
 ## Usage
