@@ -44,7 +44,9 @@ Develop an embedded AI assistant that operates **entirely locally** on a Raspber
 | **Offline Voice Recognition** | 85–95%                  | < 1 s, 2–5 s for longer phrases                  | Noise, accents, and command complexity can impact accuracy                |
 | **Offline Speech Synthesis**  | Natural voice           | Real-time or near real-time                      | Expressive/multilingual voices require more resources; quality depends on the vocal model |
 
-###Example Criteria###
+
+### Example Criteria
+
 - Short commands, limited vocabulary, latency under 1 s
 - Natural voice (FR/EN), immediate response
 - Reliable recognition of 2–5 individuals
@@ -54,9 +56,9 @@ Develop an embedded AI assistant that operates **entirely locally** on a Raspber
 ## Installation
 
 1. **Clone the repository**
-    git clone https://github.com/chcavignx/AI-Autonomous-Assistant.git
-    
-    cd AI-Autonomous-Assistant
+git clone https://github.com/chcavignx/AI-Autonomous-Assistant.git
+
+cd AI-Autonomous-Assistant
 
 2. **Install dependencies**
     For example: pip install -r requirements.txt
