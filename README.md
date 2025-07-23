@@ -111,7 +111,7 @@ TODO
 
 | Objective             | Expected Accuracy | Expected Performance         | Remarks                                      |
 |-----------------------|-------------------|------------------------------|----------------------------------------------|
-| Facial Recognition    | 95–98%            | < 1 s/face, up to 25 FPS       | Optimized with Hailo-8L and MobileNet        |
+| Facial Recognition    | 95–98%            | < 1 s/face, up to 25 FPS       | Optimized with Hailo-8L |
 | Object Detection      | 80–90%            | 5–25 FPS depending on model  | Depends on the scenario and environment      |
 | Voice Recognition     | 85–95%            | < 1 s to 2–5 s               | Short commands, quality microphone           |
 | Speech Synthesis      | Natural voice     | Real-time                    | Prioritize responsiveness                    |
