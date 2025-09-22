@@ -111,6 +111,29 @@ This complete, step-by-step guide will help you connect, configure, and test a U
     - Press F6 to select your card.
     - Adjust levels as needed.
 
+8. **Configuration File:**
+
+    To explicitly set a default audio device for ALSA, create or edit the `.asoundrc` file in your home directory.
+
+    1. **Open a terminal on your Raspberry Pi.**
+    2. **Create or edit `.asoundrc`:** Use a text editor (e.g., `vim`, `nano`) to open `~/.asoundrc`.
+    3. **Add the following configuration:** This example sets `hw:1,0` as the default playback device. Adjust the card and device numbers as needed for your hardware.
+
+    ```bash
+    pcm.!default {
+    type asym
+    playback.pcm "plughw:1,0" 
+    capture.pcm "plughw:0,0"
+    }
+    ```
+    Make sure that  "plughw:1,0"  (or whatever numbers match your device) refers to a valid playback-capable device, and  "plughw:0,0"  to a valid capture-capable device.
+
+    4. **Reboot:** Reboot your Raspberry Pi to ensure the new configuration is loaded correctly.
+
+    ```Bash
+    sudo reboot
+    ```
+
 ## Troubleshooting
 
 - **No audio devices found:** Make sure your devices are fully compatible and recognized (`lsusb`, `aplay -l`, `arecord -l`).
@@ -123,8 +146,8 @@ Create and run a simple test script (save as `audio_test.sh`):
 
 ```bash
 #!/bin/bash
-arecord -D plughw:0,0 -f cd -d 5 test.wav
-aplay -D plughw:1,0 test.wav
+arecord -f cd -d 5 test.wav
+aplay test.wav
 ```
 
 Give it executable permissions:
