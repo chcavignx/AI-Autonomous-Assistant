@@ -4,7 +4,7 @@ The goal is to enable the user to issue voice commands to the assistant without 
 
 ## Test Hardware
 
-See tests/audio_usb_test.md
+See [test usb devise](tests/audio_usb_test.md)
 
 ## Vosk
 
@@ -20,7 +20,8 @@ Processes commands almost instantly (latency < 1 second per command).
 CUDA acceleration is available with NVIDIA GPUs. Note that the Hailo module is not supported.
 
 **Installation and Test**
-See STT_offline_vosk_rpi5.md
+
+See [Vosk guide](demo/STT/vosk/STT_offline_vosk_rpi5.md)
 
 ## Whisper
 
@@ -34,7 +35,8 @@ Latency ranges from 2 to 5 seconds depending on the sentence length and the sele
 Acceleration is possible using the Hailo module.
 
 **Installation and Test**
-See STT_offline_whisper_rpi5.md
+
+See [Whisper guide](demo/STT/whisper/STT_offline_whisper_rpi5.md)
 
 ### Hugging Face Transformers & Distil-Whisper
 
