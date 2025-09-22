@@ -1,3 +1,4 @@
+## Developpment Process
 ### Priorities to Establish in Order to Meet Technical and Temporal Constraints
 
 To maximize the chances of success and avoid dispersion, it is essential to prioritize objectives based on technical complexity, impact on the AI assistant, and available time. 
@@ -59,3 +60,11 @@ Here is a prioritization proposed for the context: Raspberry Pi 5, Hailo-8L, NVM
 - **Document each step and design decision** to avoid delays during iterations or corrections.
 - **Adhere to minimum criteria**: define clear milestones (e.g., "voice command functional", "facial recognition operational") to measure progress.
 
+### Sequenced Guides for Different Modules
+
+- **Audio Modules**
+    1. [Offline Speech-to-Text (STT) Guide](STT_offline.md)
+    2. [Offline Text-to-Speech (TTS) Guide]()  (**TO DO**)
+    3. [Offline Speech-to-Speech demo]()
+        Demo application that listens to voice input from the microphone and responds with speech for specific intents. (**TO DO**)
+    
