@@ -8,7 +8,7 @@ Development of an embedded AI assistant fully operating locally on a Raspberry P
 - [Features](#features)
 - [Hardware Configuration](#hardware-configuration)
 - [Results and Benchmarks](#results-and-benchmarks)
-- [To Do](#to-do)
+- [Developpment Process](#developpment-process)
 - [Contributors](#contributors)
 - [License](#license)
 ## Overview
@@ -66,6 +66,7 @@ Install Python packages:
 ```bash
 pip install -r requirements.txt
 ```
+Still to be completed
 
 #### 3. **Hardware and Software Configuration**
     - (Specify the necessary connections and any hardware-specific steps)
@@ -116,10 +117,9 @@ TODO
 | Voice Recognition     | 85–95%            | < 1 s to 2–5 s               | Short commands, quality microphone           |
 | Speech Synthesis      | Natural voice     | Real-time                    | Prioritize responsiveness                    |
 
-## To Do
+## Developpment Process
 
-- Step-by-step documentation
-- Testing various environments or libraries specifically for the Pi 5
+[Developpment Process Guide](DEV_PROCESS.md)
 
 ## Contributors
 
