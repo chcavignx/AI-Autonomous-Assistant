@@ -41,9 +41,9 @@ See [Whisper guide](demo/STT/whisper/STT_offline_whisper_rpi5.md)
 ### Hugging Face Transformers & Distil-Whisper
 
 An alternative implementation involves using the Hugging Face Transformers library along with the Distil-Whisper model. This approach offers several advantages:
+
 - Reduced computational requirements compared to the full Whisper model.
 - Faster inference times, making it more suitable for devices with limited resources.
 - Comparable recognition accuracy on short commands.
 
 This solution is ideal for users seeking a balance between performance and efficiency.
-
