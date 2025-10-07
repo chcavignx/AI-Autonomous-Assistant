@@ -23,7 +23,11 @@ if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getcomptype() != "NONE
 
 model_name="vosk-model-small-en-us-0.15"
 # You can also init model by name or with a folder when you have downloaded it
-# Uncomment the following line to use a specific model from HuggingFace or local directory
+# Uncomment the following line to use a specific model from HuggingFace 
+# or local directory if you have already downloaded it
+# Note: You need to have internet connection to download the model from HuggingFace
+# or you can download it manually from https://alphacephei.com/vosk/models and
+# unpack it in a folder named 'models' in the current directory
 # model = Model(model_name=model_name)
 
 # If you have already downloaded the model, you can load it like this:
@@ -35,7 +39,7 @@ if not os.path.exists(local_dir):
     sys.exit(1) 
 # Load the model from the local directory
 print(f"Loading model from {model_name}")
-model = Model(local_dir)
+model = Model(model_name=local_dir)
 # Initialize the Kaldi recognizer with the model and sample rate
 rec = KaldiRecognizer(model, wf.getframerate())
 rec.SetWords(True)

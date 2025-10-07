@@ -7,7 +7,9 @@ declare -A MODELS=(
     ["fr-pguyot"]="https://alphacephei.com/vosk/models/vosk-model-small-fr-pguyot-0.3.zip"
 )
 
-
+# Get the directory of the current script
+#SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+#TARGET_DIR="$SCRIPT_DIR/models"
 # Define the target directory
 TARGET_DIR="$HOME/.cache/vosk"
 
