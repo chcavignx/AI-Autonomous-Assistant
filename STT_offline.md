@@ -1,4 +1,4 @@
-### Offline Voice Recognition (USB Microphone)
+# Offline Voice Recognition (USB Microphone)
 
 The goal is to enable the user to issue voice commands to the assistant without an internet connection. Extensive documentation and numerous examples are available; however, two methods are best suited for the hardware in use: Vosk and OpenAI Whisper (which is more resource-intensive but also highly effective).
 
@@ -11,7 +11,7 @@ See [test usb devise](tests/audio_usb_test.md)
 One of the best open-source solutions for offline voice recognition on the Raspberry Pi, compatible with multiple languages.
 
 **Precision**
-Achieves a recognition rate of 85% to 95% on short commands and limited vocabulary in a calm environment [4].
+Achieves a recognition rate of 85% to 95% on short commands and limited vocabulary in a calm environment (accuracy decreases for similar objects and crowded scenes).
 
 **Performance**
 Processes commands almost instantly (latency < 1 second per command).
