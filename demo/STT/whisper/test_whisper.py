@@ -26,7 +26,7 @@ cores_to_use = 2  # Limit to 2 cores
 #limit_cpu_for_multiprocessing(cores_to_use)
 if detect_raspberry_pi_model():
     limit_cpu_for_multiprocessing(cores_to_use)
-    model_id = f"tiny{".en" if English else ""}"# "tiny" # Recommended model for low resources
+    model_id = f"tiny{'.en' if English else ''}"# "tiny" # Recommended model for low resources
 else:
     limit_cpu_for_multiprocessing()  # Use all available cores
     model_id = "medium" # "large-v3" # "medium" # "small" # "large-v3" # "medium" # "small" # "base" # "tiny" # Recommended model for low resources
