@@ -1,5 +1,7 @@
 # AI Autonomous Assistant
+
 Development of an embedded AI assistant fully operating locally on a Raspberry Pi 5.
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -8,12 +10,14 @@ Development of an embedded AI assistant fully operating locally on a Raspberry P
 - [Features](#features)
 - [Hardware Configuration](#hardware-configuration)
 - [Results and Benchmarks](#results-and-benchmarks)
-- [Developpment Process](#developpment-process)
+- [Development Process](#development-process)
 - [Contributors](#contributors)
 - [License](#license)
+
 ## Overview
 
 Develop an embedded AI assistant that operates **entirely locally** on a Raspberry Pi, capable of:
+
 - Facial recognition (identifying individuals)
 - Object recognition (detection and classification)
 - Voice comprehension (offline speech recognition)
@@ -21,6 +25,7 @@ Develop an embedded AI assistant that operates **entirely locally** on a Raspber
 - Seamless interaction without reliance on the Internet
 
 ### Objectives
+
 - **Complete cloud independence**: All features must work without an Internet connection, ensuring confidentiality and swift responses.
 - **Natural user experience**: The assistant should be able to listen, understand, respond, and act via voice, similar to Siri or Jarvis, but operating locally.
 - **Versatility**: Ability to recognize multiple users (through facial or voice recognition) and detect various everyday objects.
@@ -28,6 +33,7 @@ Develop an embedded AI assistant that operates **entirely locally** on a Raspber
 - **Customization**: Easily add new faces, objects, or voice commands.
 
 ### Main Use Cases
+
 - **Local Voice Interaction**: Enable the user to provide voice commands to the assistant without an internet connection.
 - **Natural Vocal Feedback**: The assistant responds using text-to-speech synthesis in a fluent and intelligible manner.
 - **Facial Recognition**: Identify known individuals in front of the camera to personalize the experience or trigger specific actions.
@@ -44,7 +50,6 @@ Develop an embedded AI assistant that operates **entirely locally** on a Raspber
 | **Offline Voice Recognition** | 85–95%                  | < 1 s, 2–5 s for longer phrases                  | Noise, accents, and command complexity can impact accuracy                |
 | **Offline Speech Synthesis**  | Natural voice           | Real-time or near real-time                      | Expressive/multilingual voices require more resources; quality depends on the vocal model |
 
-
 ### Example Criteria
 
 - Short commands, limited vocabulary, latency under 1 s
@@ -56,30 +61,39 @@ Develop an embedded AI assistant that operates **entirely locally** on a Raspber
 ## Installation
 
 #### 1. **Clone the repository**
+
 ```bash
 git clone https://github.com/chcavignx/AI-Autonomous-Assistant.git
 cd AI-Autonomous-Assistant
 ```
 
 #### 2. **Install dependencies**
+
 Install Python packages:
+
 ```bash
 pip install -r requirements.txt
 ```
+
 Still to be completed
 
 #### 3. **Hardware and Software Configuration**
+
     - (Specify the necessary connections and any hardware-specific steps)
     - *Example: Connect the official camera, USB microphone, SSD NVMe, AI accelerator Hailo-8L, etc.*
 
 #### 4. **Launching the Assistant**
+
     - Example: 
+
 ```bash
 python main.py
 ```
 
 ## Usage
+
 TODO
+
 - Explain how to interact with the assistant (typical voice commands, interface, etc.).
 - Add screenshots if available or launch scripts.
 
