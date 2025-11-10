@@ -12,6 +12,7 @@ Features:
 - Clean separation of voice processing, AI logic, and TTS
 """
 
+import datetime
 import os
 import sys
 import tempfile
@@ -550,8 +551,8 @@ class AIResponseEngine:
             "hello": f"Hello! I'm {self.config.wake_word}, your AI assistant. How can I help you?",
             "hi": f"Hi there! What can I do for you?",
             "weather": f"I'm running offline and don't have access to weather data right now.",
-            "time": f"I don't have access to the current time in offline mode.",
-            "date": f"I can't check the current date while running offline.",
+            'time': 'The current time is ' + datetime.datetime.now().strftime("%I:%M %p"),  # Get the current time and format it
+            'date': 'Today, the date is: ' + datetime.datetime.now().strftime("%d %B %Y"),  # Get the current date and format it
             "lights": f"I would control your lights if I had smart home integration.",
             "music": f"I would play music if I had access to your media system.",
             "stop": f"Goodbye! Returning to wake word detection.",
