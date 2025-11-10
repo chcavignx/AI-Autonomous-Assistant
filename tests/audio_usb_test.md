@@ -48,7 +48,7 @@ This complete, step-by-step guide will help you connect, configure, and test a U
 
     output example for arecord -l -L command
 
-    ```
+    ```text
     null
     Discard all samples (playback) or generate zero samples (capture)
     sysdefault
@@ -126,6 +126,7 @@ This complete, step-by-step guide will help you connect, configure, and test a U
     capture.pcm "plughw:0,0"
     }
     ```
+
     Make sure that  "plughw:1,0"  (or whatever numbers match your device) refers to a valid playback-capable device, and  "plughw:0,0"  to a valid capture-capable device.
 
     4. **Reboot:** Reboot your Raspberry Pi to ensure the new configuration is loaded correctly.
