@@ -40,6 +40,14 @@ models/*.pt
 models/*.hef
 models/*.har
 models/hailo/*.hef
+models/*.json
+models/*.onnx
+models/*.xml
+models/*.zip
+models/*.tar
+
+#node_modules/
+node_modules/
 
 # Dataset
 data/
