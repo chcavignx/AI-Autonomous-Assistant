@@ -6,15 +6,18 @@ and outputs the transcription. The script includes system resource monitoring, d
 
 """
 
-import os
-import torch
 import gc
+import os
 import time
 
-from sysutils import *
-from transformers import AutoModelForSpeechSeq2Seq, pipeline, AutoProcessor
+import torch
 from datasets import load_dataset
-
+from sysutils import (
+    detect_raspberry_pi_model,
+    limit_cpu_for_multiprocessing,
+    print_time_usage,
+)
+from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 
 # Paths to the model and config files for French and English voices
 DATA_DIR  =  "../../../data/"
@@ -130,6 +133,7 @@ generate_kwargs = {
 print(">>> Ready to analyze audio: jfk.flac")
 #print_sys_usage("Before transcription")
 print_time_usage("Before transcription", time.time())
+result = None  # Initialize with a default value
 
 # Process audio (replace with your file)
 try:
@@ -144,11 +148,15 @@ except Exception as e:
 # ----------------------
 # Results
 # ----------------------
-print(f">>> Transcription result: {result['text']}")
+if result is not None:
+    print(f">>> Transcription result: {result['text']}")
+    # print(result)  # Uncomment to display all
+else:
+    print("Transcription failed. No result available.")
+
 # print(result)  # Uncomment to display all
 
 # Force cleanup
 gc.collect()
 
 print("=== End of script ===")
-
