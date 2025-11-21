@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-This script demonstrates how to run automatic speech recognition (ASR) using
-Hugging Face's Transformers and Datasets libraries,
+This script demonstrates how to run automatic speech recognition (ASR)
+using Hugging Face's Transformers and Datasets libraries,
 with optimizations for low-resource devices such as the Raspberry Pi.
 It loads a Whisper model from local cache, processes an audio file,
 and outputs the transcription. The script includes system resource
@@ -13,7 +13,6 @@ import os
 import time
 
 import torch
-from datasets import load_dataset
 from sysutils import (
     detect_raspberry_pi_model,
     limit_cpu_for_multiprocessing,
@@ -31,7 +30,6 @@ def main():
     print("=== Script initialization ===")
     # Raspberry Pi optimizations
     cores_to_use = 2  # Limit to 2 cores
-    dataset_name = "hf-internal-testing/librispeech_asr_dummy"
 
     if detect_raspberry_pi_model():
         os.environ["PYTORCH_JIT"] = "0"
@@ -149,7 +147,6 @@ def main():
     try:
         start_time = time.time()
         result = pipe(audio_file, generate_kwargs=generate_kwargs)
-        # print_sys_usage("After transcription")
         print_time_usage("After transcription", start_time)
     except (RuntimeError, ValueError) as e:
         print(f"Error: {e}")
