@@ -20,13 +20,15 @@ import subprocess
 import sys
 import tempfile
 import warnings
+import wave
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
-# Audio processing utilities
 import numpy as np
 import pyaudio
+import sounddevice as sd
+import soundfile as sf
 import torch
 
 # STT Dependencies
@@ -41,10 +43,6 @@ try:
 except ImportError:
     VoskModel = None
     KaldiRecognizer = None
-import wave
-
-import sounddevice as sd
-import soundfile as sf
 
 # TTS Dependencies
 from piper import PiperVoice, SynthesisConfig
@@ -67,8 +65,8 @@ warnings.filterwarnings(
 
 # ==================== CONFIGURATION CLASSES ====================
 DATA_DIR = "../data/"
-local_dir = ".cache"
-cache_dir = os.path.join(os.path.expanduser("~"), local_dir)
+LOCAL_DIR = ".cache"
+cache_dir = os.path.join(os.path.expanduser("~"), LOCAL_DIR)
 vosk_cache_dir = os.path.join(cache_dir, "vosk")
 default_vosk_model_path = os.path.join(vosk_cache_dir, "vosk-model-small-en-us-0.15")
 defaultpiper_model_path: str = os.path.join(
@@ -84,6 +82,8 @@ faster_whisper_models = whisper_openai_models
 
 
 class STTBackend(Enum):
+    """Enum for supported STT backends"""
+
     WHISPER = "whisper"
     VOSK = "vosk"
     FASTER_WHISPER = "faster_whisper"
@@ -144,7 +144,8 @@ class AgentConfig:
     # tts_to_file: bool = False  # If True, save TTS to file instead of playing directly
     # tts_to_sd: bool = False  # If True, use SoundDevice for TTS playback
     tts_to_cli: bool = (
-        False  # If True, use Piper CLI for TTS synthesis else use SoundDevice for TTS playback with Python API
+        False  # If True, use Piper CLI for TTS synthesis
+        # else use SoundDevice for TTS playback with Python API
     )
     # VAD settings
     min_speech_duration_ms: int = 250
@@ -305,9 +306,15 @@ class VADEngine:
         if detect_raspberry_pi_model():
             limit_cpu_for_multiprocessing(self.config.cpu_cores)
             if self.config.whisper_model_size in whisper_openai_models:
-                self.config.whisper_model_size = f"{self.config.whisper_model_size}{'.en' if self.config.language == 'en' else ''}"  # tiny # Recommended model for low resources
+                suffix = ".en" if self.config.language == "en" else ""
+                self.config.whisper_model_size = (
+                    f"{self.config.whisper_model_size}{suffix}"
+                )
             if self.config.faster_whisper_model_size in faster_whisper_models:
-                self.config.faster_whisper_model_size = f"{self.config.faster_whisper_model_size}{'.en' if self.config.language == 'en' else ''}"  # tiny # Recommended model for low resources
+                suffix = ".en" if self.config.language == "en" else ""
+                self.config.faster_whisper_model_size = (
+                    f"{self.config.faster_whisper_model_size}{suffix}"
+                )
         else:
             limit_cpu_for_multiprocessing()  # Use all available cores
             # self.config.whisper_model_size = "base" # "large-v3" # "medium" # "small" # "large-v3" # "medium" # "small" # "base" # "tiny" # Recommended model for low resources
@@ -440,7 +447,7 @@ class STTEngine:
 
             # Transcribe with error handling and support for different Whisper versions
             if self.config.stt_engine == STTBackend.FASTER_WHISPER:
-                segments, info = self.model.transcribe(
+                segments, _ = self.model.transcribe(
                     clean_audio,
                     multilingual=False,
                     language=self.config.language,
@@ -487,15 +494,14 @@ class STTEngine:
             if segments:
                 for segment in segments:
                     # Handle different segment formats
-                    text = (
-                        segment.get("text", "")
-                        if isinstance(segment, dict)
-                        else (
-                            getattr(segment, "text", "")
-                            if hasattr(segment, "text")
-                            else segment if isinstance(segment, str) else ""
-                        )
-                    )
+                    if isinstance(segment, dict):
+                        text = segment.get("text", "")  # pylint: disable=no-member
+                    elif hasattr(segment, "text"):
+                        text = getattr(segment, "text", "")
+                    elif isinstance(segment, str):
+                        text = segment
+                    else:
+                        text = ""
 
                     if text and text.strip():
                         text_segments.append(text.strip())
@@ -560,7 +566,7 @@ class TTSEngine:
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                 )
-                stdout, stderr = process.communicate()
+                _, stderr = process.communicate()
                 if process.returncode != 0:
                     print(f"❌ Piper CLI error: {stderr.decode()}")
                     success = False
@@ -696,7 +702,7 @@ class AIResponseEngine:
         )
 
     # TODO: Replace this method with your AI model integration
-    def generate_ai_response(self, user_input: str, context: Dict = None) -> str:
+    def generate_ai_response(self, user_input: str, _context: Dict = None) -> str:
         """
         EXTENSION POINT: Integrate your AI model here
 
@@ -790,16 +796,14 @@ class VoiceAgent:
                     if "pulse" in name_l or "default" in name_l:
                         device_index = i
                         print(
-                            "🎤 Using audio device %d: %s (channels: %d)"
-                            % (i, device_name, max_input_channels)
+                            f"🎤 Using audio device {i}: {device_name} (channels: {max_input_channels})"
                         )
                         break
                     elif device_index is None:
                         # Use first available input device as fallback
                         device_index = i
                         print(
-                            "🎤 Fallback audio device %d: %s (channels: %d)"
-                            % (i, device_name, max_input_channels)
+                            f"🎤 Fallback audio device {i}: {device_name} (channels: {max_input_channels})"
                         )
 
         except (OSError, ValueError) as e:
@@ -848,7 +852,7 @@ class VoiceAgent:
 
         try:
             while self.is_listening:
-                '''"👂 Listening for new audio chunk..."'''
+                # "👂 Listening for new audio chunk..."
                 # Read audio chunk
                 chunk_size = self.config.chunk_size
                 data = self.stream.read(chunk_size, exception_on_overflow=False)
@@ -982,8 +986,13 @@ def main():
 
     try:
         agent.start()
+    except (KeyboardInterrupt, SystemExit):
+        print("\n👋 Goodbye!")
     except Exception as e:
-        print(f"❌ Agent error: {e}")
+        print(f"❌ Unexpected error: {e}")
+        # Optional: log the full traceback for debugging
+        # import traceback
+        # traceback.print_exc()
     finally:
         agent.stop()
 
