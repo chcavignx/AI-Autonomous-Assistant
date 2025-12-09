@@ -13,7 +13,7 @@ eSpeak is a lightweight, open-source, and very simple-to-use TTS engine that wor
 1.**Install dependencies**
 
 ```bash
-pip3 install sounddevice 
+pip3 install sounddevice
 ```
 
 2.**Install the eSpeak engine**:
@@ -44,7 +44,7 @@ pip install pyttsx3
 
 ### Code Example for eSpeak
 
-This example python scryptv [text2speech_espeak.py](https://github.com/chcavignx/AI-Autonomous-Assistant/blob/main/demo/TTS/text2speech_espeak.py) uses `pyttsx3` to make eSpeak speak. It also shows how to use a specific voice model in French and English (JARVIS).
+This example python scryptv [text2speech_espeak.py](https://github.com/chcavignx/AI-Autonomous-Assistant/blob/main/examples/TTS/text2speech_espeak.py) uses `pyttsx3` to make eSpeak speak. It also shows how to use a specific voice model in French and English (JARVIS).
 
 ## 2\. Piper
 
@@ -57,7 +57,7 @@ Piper is a modern, local TTS engine developed by the **Rhasspy** community. It u
 1.**Install the `piper-tts` Python library**:
 
 See <https://github.com/OHF-Voice/piper1-gpl.git> for details
-  
+
 ```bash
 pip install piper-tts
 ```
@@ -76,7 +76,7 @@ For JARVIS voice you can find it here: <https://huggingface.co/jgkawell/jarvis/t
 
 ### Code Example for Piper
 
-This example python script [text2speech_piper.py](https://github.com/chcavignx/AI-Autonomous-Assistant/blob/main/demo/TTS/text2speech_piper.py) uses `pyttsx3` to make eSpeak speak. It also shows how to use a specific voice model in French and English (JARVIS).
+This example python script [text2speech_piper.py](https://github.com/chcavignx/AI-Autonomous-Assistant/blob/main/examples/TTS/text2speech_piper.py) uses `pyttsx3` to make eSpeak speak. It also shows how to use a specific voice model in French and English (JARVIS).
 
 To execute the test script, install the following module:
 

@@ -64,9 +64,9 @@ Here is a prioritization proposed for the context: Raspberry Pi 5, Hailo-8L, NVM
 ### Sequenced Guides for Different Modules
 
 - **Audio Modules**
-    1. [Offline Speech-to-Text (STT) Guide](STT_offline.md)
-    2. [Offline Text-to-Speech (TTS) Guide](TTS_offline.md)
-    3. [Offline Speech-to-Speech demo](demo/voice_agent_offline.md)
+    1. [Offline Speech-to-Text (STT) Guide](docs/STT_offline.md)
+    2. [Offline Text-to-Speech (TTS) Guide](docs/TTS_offline.md)
+    3. [Offline Speech-to-Speech demo](examples/voice_agent_offline.md)
         Demo application that listens to voice input from the microphone and responds with speech for specific intents (demo/voice_agent_offline.py)
 
 - **Vision Modules**
@@ -78,4 +78,4 @@ Here is a prioritization proposed for the context: Raspberry Pi 5, Hailo-8L, NVM
 - **Module Integration**
 
 - **Design Decision**
-  1. Voice Agent Solution and Architecture: [Voice Agent Offline Solution](demo/STS_VAD_models.md)
+  1. Voice Agent Solution and Architecture: [Voice Agent Offline Solution](docs/STS_VAD_models.md)
