@@ -24,6 +24,7 @@ pip3 install vosk
 Download models (from <https://alphacephei.com/vosk/models>) files to be able to use vosk offline with the following script:
 
 ```bash
+cd ~/AI-Autonomous-Assistant/scripts/models/audio
 chmod +x  vosk_models.sh
 ./vosk_models.sh
 ```
@@ -55,6 +56,6 @@ Find more examples such as using a microphone, decoding with a fixed small vocab
 
 ```bash
 git clone https://github.com/chcavignx/AI-Autonomous-Assistant.git
-cd AI-Autonomous-Assistant/demo/STT/vosk
+cd AI-Autonomous-Assistant/examples/STT/vosk
 python3 ./vosk_test_simple.py ../../../data/test.wav
 ```

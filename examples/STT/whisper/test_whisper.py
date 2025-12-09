@@ -37,12 +37,12 @@ if detect_raspberry_pi_model():
     MODEL_ID = f"tiny{'.en' if ENGLISH else ''}"  # "tiny" (Recommended model for low resources)
 else:
     limit_cpu_for_multiprocessing()  # Use all available cores
-    MODEL_ID = "medium"  # "large-v3", "medium", "small", "large-v3", "base", "tiny"(Recommended model for low resources)
+    MODEL_ID = "medium"  # "large-v3", "medium", "small", "large-v3", "base", "tiny"
 print(f"Selected model: {MODEL_ID}")
 print_time_usage("After model load", start_time)
 # --- Whisper Transcription ---
 model = whisper.load_model(MODEL_ID)
-# download_root = "~/.cache/whisper"
+# download_root = "~/.cache/whisper" # Optional, default is ~/.cache/whisper
 # device = "cpu"  or "cuda" if you have a GPU and the right setup
 # device = "cuda:0" if torch.cuda.is_available() else "cpu"
 # model = whisper.load_model(MODEL_ID, download_root=download_root, device=device)

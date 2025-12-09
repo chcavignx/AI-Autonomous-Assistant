@@ -107,7 +107,7 @@ You can find it here: https://huggingface.co/jgkawell/jarvis/tree/main/en/en_GB/
 
 ### 5. Demo Application
 
-The demo application is available at https://github.com/chcavignx/AI-Autonomous-Assistant/tree/main/demo/voice_agent_offline.py
+The demo application is available at https://github.com/chcavignx/AI-Autonomous-Assistant/tree/main/examples/voice_agent_offline.py
 
 ```bash
 python voice_agent_offline.py

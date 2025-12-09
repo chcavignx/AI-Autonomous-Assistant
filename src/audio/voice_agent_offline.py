@@ -64,7 +64,7 @@ warnings.filterwarnings(
 
 
 # ==================== CONFIGURATION CLASSES ====================
-DATA_DIR = "../data/"
+DATA_DIR = "../../data/"
 LOCAL_DIR = ".cache"
 cache_dir = os.path.join(os.path.expanduser("~"), LOCAL_DIR)
 vosk_cache_dir = os.path.join(cache_dir, "vosk")
