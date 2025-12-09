@@ -35,7 +35,8 @@ import torch
 # import sys; sys.path.insert(0, "/home/cca/whisper");
 import whisper
 from faster_whisper import WhisperModel
-from sysutils import detect_raspberry_pi_model, limit_cpu_for_multiprocessing
+
+from src.utils.sysutils import detect_raspberry_pi_model, limit_cpu_for_multiprocessing
 
 try:
     from vosk import KaldiRecognizer

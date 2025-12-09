@@ -13,12 +13,13 @@ import os
 import time
 
 import torch
-from sysutils import (
+from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
+
+from src.utils.sysutils import (
     detect_raspberry_pi_model,
     limit_cpu_for_multiprocessing,
     print_time_usage,
 )
-from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 
 # Paths to the model and config files for French and English voices
 DATA_DIR = "../../../data/"

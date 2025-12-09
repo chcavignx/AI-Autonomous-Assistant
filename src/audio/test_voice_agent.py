@@ -63,7 +63,7 @@ def mod() -> Generator[Any, None, None]:
         detect_raspberry_pi_model=lambda: False,
         limit_cpu_for_multiprocessing=lambda *args, **kwargs: None,
     )
-    fake_modules["sysutils"] = sysutils
+    fake_modules["src.utils.sysutils"] = sysutils
 
     # vosk fake
     vosk_mod = types.SimpleNamespace()

@@ -4,7 +4,8 @@ import os
 import time
 
 import whisper
-from sysutils import (
+
+from src.utils.sysutils import (
     detect_raspberry_pi_model,
     limit_cpu_for_multiprocessing,
     print_time_usage,

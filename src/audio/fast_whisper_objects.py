@@ -2,7 +2,8 @@
 import os
 
 from huggingface_hub import snapshot_download
-from sysutils import detect_raspberry_pi_model
+
+from src.utils.sysutils import detect_raspberry_pi_model
 
 MODELS_NAMES = (
     "Systran/faster-whisper-small",
