@@ -84,7 +84,8 @@ Still to be completed
 
 #### 4. **Launching the Assistant**
 
-    - Example: 
+TODO
+    - Example:
 
 ```bash
 python main.py
@@ -133,7 +134,7 @@ TODO
 
 ## Developpment Process
 
-[Developpment Process Guide](DEV_PROCESS.md)
+[Developpment Process Guide](docs/DEV_PROCESS.md)
 
 ## Contributors
 

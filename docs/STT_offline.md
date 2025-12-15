@@ -4,7 +4,7 @@ The goal is to enable the user to issue voice commands to the assistant without 
 
 ## Test Hardware
 
-See [test usb devise](docs/audio_usb_test.md)
+See [test usb devise](https://github.com/chcavignx/AI-Autonomous-Assistant/blob/main/docs/audio_usb_test.md)
 
 ## Vosk
 
@@ -21,7 +21,7 @@ CUDA acceleration is available with NVIDIA GPUs. Note that the Hailo module is n
 
 **Installation and Test**
 
-See [Vosk guide](examples/STT/vosk/STT_offline_vosk_rpi5.md)
+See [Vosk guide](https://github.com/chcavignx/AI-Autonomous-Assistant/blob/main/examples/STT/vosk/STT_offline_vosk_rpi5.md)
 
 ## Whisper
 
@@ -36,7 +36,7 @@ Acceleration is possible using the Hailo module.
 
 **Installation and Test**
 
-See [Whisper guide](examples/STT/whisper/STT_offline_whisper_rpi5.md)
+See [Whisper guide](https://github.com/chcavignx/AI-Autonomous-Assistant/blob/main/examples/STT/whisper/STT_offline_whisper_rpi5.md)
 
 ### Hugging Face Transformers & Distil-Whisper
 
