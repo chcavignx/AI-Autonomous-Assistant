@@ -35,6 +35,12 @@ runs:
         echo "uv download cache hit: ${{ steps.setup_uv.outputs['cache-hit'] }}"
         echo ".venv cache hit: ${{ steps.cache_venv.outputs.cache-hit }}"
 
+    - name: Install system dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg portaudio19-dev alsa-utils espeak-ng
+
     - name: Install the project dependencies
       shell: bash
       working-directory: ${{ inputs.working-directory }}
