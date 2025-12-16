@@ -46,7 +46,7 @@ dill==0.4.0
     #   multiprocess
 faster-whisper==1.2.1
     # via ai-autonomous-assistant (pyproject.toml)
-filelock==3.20.0
+filelock==3.20.1
     # via
     #   datasets
     #   huggingface-hub

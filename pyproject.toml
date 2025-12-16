@@ -53,6 +53,7 @@ dependencies = [
     "openai-whisper>=20230314",
     "pillow>=10.0.0",
     "piper-tts>=0.1.0",
+    "pyaudio>=0.2.14",
     "pydub>=0.25.1",
     "pyttsx3>=2.90",
     "requests>=2.31.0",
@@ -67,6 +68,7 @@ dependencies = [
     "torchaudio>=2.0.2",
     "torchvision>=0.15.2",
     "transformers>=4.35.0",
+    "vosk>=0.3.45",
 ]
 
 # Dépendances optionnelles pour CI/CD
@@ -90,9 +92,9 @@ ci = [
 override-dependencies = [
     "numpy>=1.26.0,<2.0"
 ]
-required-environments = [
-    "sys_platform == 'darwin' and platform_machine == 'arm64'"
-]
+# required-environments = [
+#     "sys_platform == 'darwin' and platform_machine == 'arm64'"
+# ]
 
 [tool.mypy]
 python_version = "3.11"
