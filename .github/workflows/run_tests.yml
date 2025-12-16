@@ -1,0 +1,81 @@
+name: _run-tests
+on:
+  workflow_call:
+    inputs:
+      marker:
+        description: 'pytest -m expression (e.g., `not integration` or `integration`)'
+        required: true
+        type: string
+    secrets: {}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # If set, uv will run without updating the uv.lock file. Equivalent to the `uv run --frozen`.
+  UV_FROZEN: "1"
+
+jobs:
+  ruff:
+    name: Ruff
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Install dependencies
+        uses: ./.github/actions/python-uv-setup
+      - name: Run Ruff linter
+        run: uv run ruff check .
+      - name: Run Ruff formatter
+        run: uv run ruff format --check .
+
+  mypy:
+    name: Mypy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Install dependencies
+        uses: ./.github/actions/python-uv-setup
+      # Restore mypy cache to speed up the run
+      - name: Restore mypy cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .mypy_cache
+          key: mypy-cache-${{ hashFiles('pyproject.toml') }}
+      # - name: Run mypy for core
+      #   run: uv run mypy --install-types --non-interactive agents-core/vision_agents
+      # - name: Run mypy for plugins
+      #   run: uv run mypy --install-types --non-interactive --exclude 'plugins/.*/tests/.*' plugins
+      # Save the updated mypy cache
+
+
+  test:
+    name: Test "${{ inputs.marker }}"
+    runs-on: ubuntu-latest
+    # env:
+    #   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    #   GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+    #   OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    #   OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Install dependencies
+        uses: ./.github/actions/python-uv-setup
+      # - name: Export AWS_BEARER_TOKEN_BEDROCK (heredoc)
+      #   shell: bash
+      #   run: |
+      #     {
+      #       echo 'AWS_BEARER_TOKEN_BEDROCK<<EOF'
+      #       echo "${{ secrets.AWS_BEARER_TOKEN_BEDROCK }}"
+      #       echo 'EOF'
+      #     } >> "$GITHUB_ENV"
+
+      # - name: Verify presence
+      #   run: uv run python -c "import os; v=os.getenv('AWS_BEARER_TOKEN_BEDROCK'); print('exists', v is not None, 'len', 0 if v is None else len(v))"
+      - name: Run core tests
+        run: uv run pytest -n auto -m "${{ inputs.marker }}" tests/
+      # - name: Run plugin tests
+      #   run: uv run pytest -n auto -m "${{ inputs.marker }}" plugins/*/tests/*.py
