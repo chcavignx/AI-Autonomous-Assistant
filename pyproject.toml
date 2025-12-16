@@ -8,9 +8,34 @@ version = "0.1.0"
 description = "AI Autonomous Assistant"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICEN[CS]E.*"]
+keywords = ["AI", "Autonomous", "Assistant","Raspberry PI"]
 authors = [
     {name = "Chcavignx", email = "chcavignx@gmail.com"}
+]
+maintainers = [
+    {name = "Chcavignx", email = "chcavignx@gmail.com"}
+]
+
+classifiers = [
+  # How mature is this project? Common values are
+  #   1 - Planning
+  #   2 - Pre-Alpha
+  #   3 - Alpha
+  #   4 - Beta
+  #   5 - Production/Stable
+  "Development Status :: 2 - Pre-Alpha",
+
+  # Indicate who your project is intended for
+  "Intended Audience :: Developers",
+  "Topic :: Software Development :: Build Tools",
+
+  # Specify the Python versions you support here.
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
 ]
 
 # Dépendances principales (runtime)
