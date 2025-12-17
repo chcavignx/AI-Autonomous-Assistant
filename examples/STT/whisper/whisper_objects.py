@@ -4,7 +4,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from sysutils import detect_raspberry_pi_model
+from src.utils.sysutils import detect_raspberry_pi_model
 
 # Define the target directory
 TARGET_DIR = Path.home() / ".cache" / "whisper"
