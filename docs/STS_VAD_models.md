@@ -118,7 +118,7 @@ Voice Activity Detection (VAD) is a critical component in modern speech processi
 **Architecture Components**:
 
 1. **Wake Word Detection**: SpeechRecognition library with energy-based VAD
-2. **Precise VAD**: Silero VAD for accurate speech segmentation  
+2. **Precise VAD**: Silero VAD for accurate speech segmentation
 3. **Main STT**: Faster-Whisper with optimized settings
 4. **TTS Integration**: Piper TTS for complete offline operation
 

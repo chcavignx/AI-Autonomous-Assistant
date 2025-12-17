@@ -17,7 +17,6 @@ model_names = (
 cache_dir = os.path.join(os.path.expanduser("~"), ".cache/huggingface")
 # repo_type="model" if None is by default "model" - Not mandatory but for clarity
 for model_name in model_names:
-
     print(f"Downloading and saving {model_name} to {cache_dir}")
     # Download and save Model from Hugging Face Hub
     snapshot_download(repo_id=model_name, repo_type="model", cache_dir=cache_dir)
@@ -31,7 +30,6 @@ data_set_names = (
 )
 
 for data_set_name in data_set_names:
-
     print(f"Downloading and saving {data_set_name} to {cache_dir}")
     # Load a hosted dataset
     snapshot_download(repo_id=data_set_name, repo_type="dataset", cache_dir=cache_dir)

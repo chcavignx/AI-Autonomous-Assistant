@@ -22,18 +22,18 @@ download_and_extract() {
     local model_name="$1"
     local url="$2"
     local filename=$(basename "$url")
-    
+
     echo "Downloading $model_name model..."
-    
+
     # Download the file
     if curl -L -o "$filename" "$url"; then
         echo "Downloaded $filename successfully"
-        
+
         # Unzip the file
         echo "Extracting $filename..."
         if unzip -q "$filename"; then
             echo "Extracted $filename successfully"
-            
+
             # Remove the zip file
             rm "$filename"
             echo "Removed $filename"

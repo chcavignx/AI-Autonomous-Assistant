@@ -18,12 +18,12 @@ if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getcomptype() != "NONE
 # Initialize the Vosk model
 # You can initialize the model with a specific language or use the default model
 # Uncomment the following line to use a specific language model from online repository
-#model = Model(lang="en-us")
+# model = Model(lang="en-us")
 
 
-model_name="vosk-model-small-en-us-0.15"
+model_name = "vosk-model-small-en-us-0.15"
 # You can also init model by name or with a folder when you have downloaded it
-# Uncomment the following line to use a specific model from HuggingFace 
+# Uncomment the following line to use a specific model from HuggingFace
 # or local directory if you have already downloaded it
 # Note: You need to have internet connection to download the model from HuggingFace
 # or you can download it manually from https://alphacephei.com/vosk/models and
@@ -35,8 +35,10 @@ vosk_local_dir = ".cache/vosk"
 cache_dir = os.path.join(os.path.expanduser("~"), vosk_local_dir)
 local_dir = os.path.join(cache_dir, model_name)
 if not os.path.exists(local_dir):
-    print(f"Model {model_name} not found. Please download it from https://alphacephei.com/vosk/models")
-    sys.exit(1) 
+    print(
+        f"Model {model_name} not found. Please download it from https://alphacephei.com/vosk/models"
+    )
+    sys.exit(1)
 # Load the model from the local directory
 print(f"Loading model from {model_name}")
 model = Model(model_name=local_dir)

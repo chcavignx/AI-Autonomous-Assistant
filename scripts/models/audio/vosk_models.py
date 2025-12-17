@@ -14,6 +14,7 @@ MODELS = {
 TARGET_DIR = os.path.expanduser("~/.cache/vosk")
 os.makedirs(TARGET_DIR, exist_ok=True)
 
+
 def download_and_extract(model_name, url):
     filename = os.path.basename(url)
     filepath = os.path.join(TARGET_DIR, filename)
@@ -37,6 +38,7 @@ def download_and_extract(model_name, url):
     os.remove(filepath)
     print(f"Removed {filename}")
 
+
 def model_exists(model_name):
     # Try to use vosk.Model if available
     try:
@@ -58,6 +60,7 @@ def model_exists(model_name):
             if model_name in entry and os.path.isdir(os.path.join(TARGET_DIR, entry)):
                 return True
         return False
+
 
 if __name__ == "__main__":
     for model_name, url in MODELS.items():

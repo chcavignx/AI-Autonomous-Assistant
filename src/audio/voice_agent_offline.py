@@ -120,9 +120,7 @@ class AgentConfig:
 
     whisper_model_size: str = "base"  # tiny, base, small, medium
     whisper_download_root: str = os.path.join(os.path.expanduser("~"), ".cache/whisper")
-    translate: bool = (
-        False  # Set to True to translate to English, False to transcribe in original language
-    )
+    translate: bool = False  # Set to True to translate to English, False to transcribe in original language
     language: str = "en"  # if english else "fr"  # Language code for Whisper
     faster_whisper_model_size: str = "base"  # medium.en, small, large_v3
     faster_whisper_download_root: str = os.path.join(
