@@ -6,9 +6,9 @@ inputs:
     required: false
     default: "3.11.6"
   sync-flags:
-    description: Extra flags for uv sync (e.g., --all-extras --dev)
+    description: Extra flags for uv sync (e.g., --all-extras --dev --frozen)
     required: false
-    default: "--all-extras --dev --frozen"
+    default: "--all-extras --dev"
   working-directory:
     description: Directory to run in
     required: false
