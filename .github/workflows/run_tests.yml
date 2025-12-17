@@ -65,7 +65,7 @@ jobs:
     name: RPI Compatibility
     runs-on: ubuntu-latest
     container:
-      image: arm64v8/debian:bookworm  # Simule RPi5
+      image: arm64v8/debian # :bookworm  # Simule RPi5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
