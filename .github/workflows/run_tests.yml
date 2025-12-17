@@ -63,12 +63,12 @@ jobs:
 
   rpi-compat:
     name: RPI Compatibility
-    runs-on: ubuntu-latest
-    container:
-      image: arm64v8/debian # :bookworm  # Simule RPi5
+    runs-on: ubuntu-24.04-arm  # or ubuntu-22.04-arm
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Check architecture
+        run: uname -m
       - name: Install dependencies
         uses: ./.github/actions/python-uv-setup
       - name: Sync for RPi
