@@ -442,9 +442,9 @@ def test_ai_intent_matching(mod):
     assert cont is True, "Should continue after greeting"
 
     resp, cont = ai_engine.generate_response("stop")
-    assert (
-        "Goodbye" in resp or "goodbye" in resp.lower()
-    ), f"Unexpected response: {resp}"
+    assert "Goodbye" in resp or "goodbye" in resp.lower(), (
+        f"Unexpected response: {resp}"
+    )
     assert cont is False, "Should not continue after stop command"
 
 
