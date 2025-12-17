@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 import os
-import subprocess
-import sys
 from huggingface_hub import snapshot_download
 
 
@@ -26,7 +24,7 @@ model_names = (
 # ------------------------------------------------------------------------------
 # Backup directory .cache /huggingface
 cache_dir = os.path.join(os.path.expanduser("~"), ".cache/huggingface")
-repo_type="model" # if None is by default "model" - Not mandatory but for clarity
+repo_type = "model"  # if None is by default "model" - Not mandatory but for clarity
 for model_name in model_names:
     print(f"Downloading and saving {model_name} to {cache_dir}")
     # Download and save Model from Hugging Face Hub
@@ -42,7 +40,7 @@ for model_name in model_names:
 #     # "openai/whisper-medium.en",
 #     "openai/whisper-tiny",
 #     "openai/whisper-tiny.en",
-#     "openai/whisper-base",      
+#     "openai/whisper-base",
 #     "openai/whisper-base.en",
 #     # "openai/whisper-large",
 # )
@@ -75,17 +73,14 @@ for model_name in model_names:
 #             print(f"❌ ct2-transformers-converter CLI error: {e}")
 #             success = False
 #     if success:
-#         print(f"✅ ct2-transformers-converter CLI succeeded for {model_name}")  
+#         print(f"✅ ct2-transformers-converter CLI succeeded for {model_name}")
 #         print(f"Model saved to: {cache_dir}/{model_name.replace('/', '-')}-ct2")
 #     else:
-#         print(f"❌ ct2-transformers-converter CLI failed for {model_name}") 
+#         print(f"❌ ct2-transformers-converter CLI failed for {model_name}")
 # Requirements:
 # pip install huggingface-hub
-# pip install faster-whisper        
+# pip install faster-whisper
 # pip install transformers[torch]>=4.23
 
 # ct2-transformers-converter --model openai/whisper-large-v3 --output_dir whisper-large-v3-ct2
 # --copy_files tokenizer.json preprocessor_config.json --quantization float16
-
-    
-
