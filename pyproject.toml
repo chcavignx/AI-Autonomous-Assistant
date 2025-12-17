@@ -36,24 +36,24 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
-  "Operating System :: POSIX :: Linux",
-  "Operating System :: Raspberry Pi",
 ]
 
 # Dépendances principales (runtime)
 dependencies = [
-    "flask>=2.3.0",
+    "blobfile",
     "flask-cors>=4.0.0",
+    "flask>=2.3.0",
     "joblib>=1.3.0",
     "librosa>=0.10.0",
-    "numpy>=1.24.0",
+    "loguru>=0.7.0",
     "numba>=0.57.0",
-    "pydub>=0.25.1",
-    "python-dotenv>=1.0", # Variables d'environnement
-    "pyyaml>=6.0", # Config files
-    "requests>=2.31.0", # HTTP requests
-    "loguru>=0.7.0", # Logging
-    "blobfile",
+    "numpy>=1.24.0",
+    "pydantic>=2.0.0",
+    "python-dotenv",
+    "pyyaml>=6.0",
+    "requests>=2.31.0",
+    "types-requests",
+    "typing-extensions>=4.12",
 ]
 
 # Dépendances optionnelles pour CI/CD
@@ -67,35 +67,36 @@ ai = [
     "transformers>=4.35.0",
 ]
 vision = [
-    "torchvision>=0.15.2",
     "pillow>=10.0.0",
     "torch>=2.0.2",
+    "torchvision>=0.15.2",
 ]
 audio = [
-    "torchaudio>=2.0.2",
-    "speechrecognition>=3.10.0",
-    "vosk>=0.3.45",
-    "openai-whisper>=20230314",
     "faster-whisper>=0.1.3",
-    "pyttsx3>=2.90",
+    "openai-whisper>=20230314",
+    "piper-tts>=0.1.0",
     "pydub>=0.25.1",
+    "pyttsx3>=2.90",
     "scipy>=1.11.0",
+    "silero-vad>=2.0.0",
     "sounddevice>=0.4.6",
     "soundfile>=0.12.1",
-    "piper-tts>=0.1.0",
-    "silero-vad>=2.0.0",
+    "speechrecognition>=3.10.0",
+    "torchaudio>=2.0.2",
+    "vosk>=0.3.45",
 ]
 dev = [
+    "basedpyright>=1.31.7",
+    "gitingest",
+    "mypy>=1.5.0",
+    "poethepoet",
+    "pre-commit",
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "pytest-xdist>=3.0.0",
-    "mypy>=1.5.0",
-    "ruff>=0.1.0",
-    "pre-commit>=4.0.0",
-]
-ci = [
-    "pytest>=7.4.0",
-    "pytest-cov>=4.1.0",
+    "radon",
+    "ruff",
+    "skylos",
 ]
 rpi = [
     "pyaudio>=0.2.14",
@@ -130,8 +131,26 @@ explicit_package_bases = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=src --cov-report=html --cov-report=term-missing"
 python_files = ["test_*.py", "*_test.py", "__test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "-W error",  # STRICT: Treat warnings as errors (catch deprecations early)
+    "--tb=short",
+    "--cov=.",
+    "--cov-report=term-missing:skip-covered",
+    "--cov-report=html",
+    "--cov-report=xml",
+    "--cov-fail-under=80",  # STRICT: Require 80% coverage
+]
+filterwarnings = [
+    "error",  # Treat all warnings as errors by default
+    # Uncomment to selectively ignore specific third-party warnings if needed:
+    # "ignore::DeprecationWarning:some_noisy_library",
+    # "ignore::UserWarning:another_library",
+]
 
 exclude = [
 "**/__pycache__",
@@ -142,6 +161,15 @@ exclude = [
 "**/.pytest_cache/",
 "**/.mypy_cache/",
 "**/.ruff_cache/",
-"examples/",
+"**/examples/",
 "**/test*",
+"**/node_modules",
+".git",
+".pyright_cache",
+".venv",
+"venv",
+"env",
+"logs",
+"outputs",
+"*.egg-info",
 ]

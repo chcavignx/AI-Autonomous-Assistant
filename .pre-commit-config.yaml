@@ -4,20 +4,29 @@ repos:
     hooks:
       - id: ruff-check
         args: [--fix]
+        description: "Run 'ruff check' for extremely fast Python linting"
       - id: ruff-format
+        description: "Run 'ruff format' for extremely fast Python formatting"
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
       - id: trailing-whitespace
+        description: "Run 'trailing-whitespace' for removing trailing whitespace"
       - id: end-of-file-fixer
+        description: "Run 'end-of-file-fixer' for removing end of file"
       - id: check-yaml
+        description: "Run 'check-yaml' for checking YAML files"
       - id: check-json
+        description: "Run 'check-json' for checking JSON files"
       - id: check-toml
+        description: "Run 'check-toml' for checking TOML files"
       - id: detect-private-key
+        description: "Run 'detect-private-key' for detecting private keys"
       - id: check-added-large-files
-      - id: debug-statements
+        description: "Run 'check-added-large-files' for checking added large files"
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v2.3.0
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]
+        description: "Run 'conventional-pre-commit' for conventional commit messages"
