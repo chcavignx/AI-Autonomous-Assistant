@@ -11,9 +11,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  # If set, uv will run without updating the uv.lock file. Equivalent to the `uv run --frozen`.
-  # UV_FROZEN: "1"
+# env:
+#   # If set, uv will run without updating the uv.lock file. Equivalent to the `uv run --frozen`.
+#   UV_FROZEN: "1"
 
 jobs:
   ruff:
