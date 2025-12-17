@@ -21,11 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg portaudio19-dev alsa-utils espeak-ng
+        uses: actions/checkout@v4
       - name: Install dependencies
         uses: ./.github/actions/python-uv-setup
       - name: Run Ruff linter
@@ -38,11 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg portaudio19-dev alsa-utils espeak-ng
+        uses: actions/checkout@v4
       - name: Install dependencies
         uses: ./.github/actions/python-uv-setup
       # Restore mypy cache to speed up the run
@@ -51,12 +43,6 @@ jobs:
         with:
           path: .mypy_cache
           key: mypy-cache-${{ hashFiles('pyproject.toml') }}
-      # - name: Run mypy for core
-      #   run: uv run mypy --install-types --non-interactive agents-core/vision_agents
-      # - name: Run mypy for plugins
-      #   run: uv run mypy --install-types --non-interactive --exclude 'plugins/.*/tests/.*' plugins
-      # Save the updated mypy cache
-
 
   test:
     name: Test "${{ inputs.marker }}"
@@ -69,25 +55,27 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg portaudio19-dev alsa-utils espeak-ng
+        uses: actions/checkout@v4
       - name: Install dependencies
         uses: ./.github/actions/python-uv-setup
-      # - name: Export AWS_BEARER_TOKEN_BEDROCK (heredoc)
-      #   shell: bash
-      #   run: |
-      #     {
-      #       echo 'AWS_BEARER_TOKEN_BEDROCK<<EOF'
-      #       echo "${{ secrets.AWS_BEARER_TOKEN_BEDROCK }}"
-      #       echo 'EOF'
-      #     } >> "$GITHUB_ENV"
-
-      # - name: Verify presence
-      #   run: uv run python -c "import os; v=os.getenv('AWS_BEARER_TOKEN_BEDROCK'); print('exists', v is not None, 'len', 0 if v is None else len(v))"
       - name: Run core tests
         run: uv run pytest -n auto -m "${{ inputs.marker }}" tests/
-      # - name: Run plugin tests
-      #   run: uv run pytest -n auto -m "${{ inputs.marker }}" plugins/*/tests/*.py
+
+  rpi-compat:
+    name: RPI Compatibility
+    runs-on: ubuntu-latest
+    container:
+      image: arm64v8/debian:bookworm  # Simule RPi5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        uses: ./.github/actions/python-uv-setup
+      - name: Sync for RPi
+        run: uv sync --locked --extra rpi
+      - name: Verify imports
+        run: |
+          python -c "import sys; print(f'Python: {sys.version}')"
+          python -c "import struct; print(f'64-bit: {struct.calcsize(\"P\") * 8} bits')"
+      - name: Run core tests
+        run: uv run pytest -n auto -m "${{ inputs.marker }}" tests/
