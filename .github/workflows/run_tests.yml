@@ -11,14 +11,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# env:
-#   # If set, uv will run without updating the uv.lock file. Equivalent to the `uv run --frozen`.
-#   UV_FROZEN: "1"
+env:
+  # If set, uv will run without updating the uv.lock file. Equivalent to the `uv run --frozen`.
+  UV_FROZEN: "1"
 
 jobs:
   ruff:
     name: Ruff
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,7 +31,7 @@ jobs:
 
   mypy:
     name: Mypy
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,7 +46,7 @@ jobs:
 
   test:
     name: Test "${{ inputs.marker }}"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     # env:
     #   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     #   GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
@@ -56,6 +56,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Check architecture
+        run: uname -m
       - name: Install dependencies
         uses: ./.github/actions/python-uv-setup
       - name: Run core tests
@@ -72,7 +74,7 @@ jobs:
       - name: Install dependencies
         uses: ./.github/actions/python-uv-setup
       - name: Sync for RPi
-        run: uv sync --locked --extra rpi
+        run: uv sync --extra rpi
       - name: Verify imports
         run: |
           python -c "import sys; print(f'Python: {sys.version}')"
