@@ -153,8 +153,12 @@ filterwarnings = [
     # "ignore::DeprecationWarning:some_noisy_library",
     # "ignore::UserWarning:another_library",
 ]
+markers = [
+    "basic: marks basic infrastructure tests",
+    "integration: marks integration or long-running tests",
+]
 
-exclude = [
+norecursedirs = [
 "**/__pycache__",
 "**/tests/__pycache__",
 "**/*.pyc",
