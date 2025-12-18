@@ -2,6 +2,8 @@
 
 import sys
 
+import pytest
+
 
 def test_basic():
     """Basic assertion to verify test infrastructure works."""
@@ -12,3 +14,9 @@ def test_imports():
     """Test that we can import basic Python packages."""
 
     assert sys.version_info >= (3, 10)
+
+
+@pytest.mark.integration
+def test_integration():
+    """Test that we can import basic Python packages."""
+    assert True

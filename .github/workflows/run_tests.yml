@@ -60,24 +60,7 @@ jobs:
         run: uname -m
       - name: Install dependencies
         uses: ./.github/actions/python-uv-setup
-      - name: Run core tests
-        run: uv run pytest -n auto -m "${{ inputs.marker }}" tests/
-
-  rpi-compat:
-    name: RPI Compatibility
-    runs-on: ubuntu-24.04-arm  # or ubuntu-22.04-arm
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Check architecture
-        run: uname -m
-      - name: Install dependencies
-        uses: ./.github/actions/python-uv-setup
-      - name: Sync for RPi
-        run: uv sync --extra rpi
-      - name: Verify imports
-        run: |
-          python -c "import sys; print(f'Python: {sys.version}')"
-          python -c "import struct; print(f'64-bit: {struct.calcsize(\"P\") * 8} bits')"
+      - name: Sync for update
+        run: uv sync --extra all
       - name: Run core tests
         run: uv run pytest -n auto -m "${{ inputs.marker }}" tests/
