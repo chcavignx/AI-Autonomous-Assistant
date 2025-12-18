@@ -3,7 +3,7 @@ on:
   workflow_call:
     inputs:
       marker:
-        description: 'pytest -m expression (e.g., `not integration` or `integration`)'
+        description: 'pytest -m expression (e.g., "basic", "integration", "not integration")'
         required: true
         type: string
     secrets: {}
