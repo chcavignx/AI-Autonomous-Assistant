@@ -101,7 +101,6 @@ dev = [
 rpi = [
     "pyaudio>=0.2.14",
 ]
-
 all = [
     "ai-autonomous-assistant[audio,ai,vision,dev,rpi]",
 ]
@@ -112,8 +111,11 @@ all = [
 override-dependencies = [
     "numpy>=1.26.0,<2.0"
 ]
+# Support multiple platforms: macOS (dev), Linux x86_64 (CI), Linux ARM64 (CI/RPI)
 environments = [
-    "sys_platform == 'linux' and platform_machine == 'aarch64'",  # ARM64
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",  # macOS (local development)
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",  # ARM64 (RPI/CI)
+    # "sys_platform == 'linux' and platform_machine == 'x86_64'",  # x86_64 (CI/servers)
 ]
 
 [tool.mypy]
