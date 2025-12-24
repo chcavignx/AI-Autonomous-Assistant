@@ -9,7 +9,7 @@ description = "AI Autonomous Assistant"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
-license-files = ["LICEN[CS]E.*"]
+license-files = ["LICENSE.txt"]
 keywords = ["AI", "Autonomous", "Assistant","Raspberry PI"]
 authors = [
     {name = "Chcavignx", email = "chcavignx@gmail.com"}
@@ -114,8 +114,7 @@ override-dependencies = [
 # Support multiple platforms: macOS (dev), Linux x86_64 (CI), Linux ARM64 (CI/RPI)
 environments = [
     "sys_platform == 'darwin' and platform_machine == 'arm64'",  # macOS (local development)
-    "sys_platform == 'linux' and platform_machine == 'aarch64'",  # ARM64 (RPI/CI)
-    # "sys_platform == 'linux' and platform_machine == 'x86_64'",  # x86_64 (CI/servers)
+    "sys_platform == 'linux' and platform_machine == 'aarch64'"  # ARM64 (RPI/CI)
 ]
 
 [tool.mypy]

@@ -1,0 +1,31 @@
+# AI Autonomous Assistant Configuration
+
+# Directory paths relative to project root
+paths:
+  src: "src"
+  data: "data"
+  cache: ".cache"
+  models: "models"
+
+# Speech-to-Text configuration
+stt:
+  engine: "whisper" # whisper, vosk, faster_whisper
+  model_size: "tiny"
+  language: "en"
+  transformers: false
+  transformers_engine: "huggingface"
+  download_root: "cache/models/{transformers_engine if transformers else engine}/"
+
+# Text-to-Speech configuration
+tts:
+  engine: "piper"
+  model_name: "jarvis-medium.onnx"
+  model_path: "cache/models/{engine}/{model_name}"
+  cli_mode: false
+
+# Voice Activity Detection configuration
+vad:
+  min_speech_duration_ms: 250
+  min_silence_duration_ms: 500
+  silence_timeout_seconds: 3
+  max_recording_seconds: 15

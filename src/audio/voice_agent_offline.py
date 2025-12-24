@@ -30,13 +30,18 @@ import pyaudio
 import sounddevice as sd
 import soundfile as sf
 import torch
-
-# STT Dependencies
-# import sys; sys.path.insert(0, "/home/cca/whisper");
 import whisper
 from faster_whisper import WhisperModel
 
-from src.utils.sysutils import detect_raspberry_pi_model, limit_cpu_for_multiprocessing
+# Ensure 'src' is in sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+# TTS & VAD Dependencies
+from piper import PiperVoice, SynthesisConfig
+from silero_vad import get_speech_timestamps, load_silero_vad
+
+from utils import config
+from utils.sysutils import detect_raspberry_pi_model, limit_cpu_for_multiprocessing
 
 try:
     from vosk import KaldiRecognizer
@@ -45,11 +50,8 @@ except ImportError:
     VoskModel = None
     KaldiRecognizer = None
 
-# TTS Dependencies
-from piper import PiperVoice, SynthesisConfig
-
-# VAD Dependencies
-from silero_vad import get_speech_timestamps, load_silero_vad
+config.setup_python_path()
+config = config.load_config()
 
 # Suppress specific runtime warnings from faster_whisper
 warnings.filterwarnings(
@@ -65,14 +67,13 @@ warnings.filterwarnings(
 
 
 # ==================== CONFIGURATION CLASSES ====================
-DATA_DIR = "../../data/"
-LOCAL_DIR = ".cache"
-cache_dir = os.path.join(os.path.expanduser("~"), LOCAL_DIR)
-vosk_cache_dir = os.path.join(cache_dir, "vosk")
-default_vosk_model_path = os.path.join(vosk_cache_dir, "vosk-model-small-en-us-0.15")
-defaultpiper_model_path: str = os.path.join(
-    DATA_DIR, "jarvis-medium.onnx"
-)  # "en_US-amy-medium.onnx"
+DATA_DIR = str(config.paths.data_path)
+CACHE_DIR = str(config.paths.cache_path)
+MODEL_DIR = str(config.paths.models_path)
+vosk_cache_dir = os.path.join(CACHE_DIR, "vosk")
+VOSK_MODEL_NAME = "vosk-model-small-en-us-0.15"
+default_vosk_model_path = os.path.join(vosk_cache_dir, VOSK_MODEL_NAME)
+default_piper_model_path: str = str(config.tts.full_model_path)
 whisper_openai_models = [
     "tiny",
     "base",
@@ -109,6 +110,7 @@ class AgentConfig:
     # Audio settings
     sample_rate: int = 16000
     chunk_size: int = 1024
+
     # Optional Parameters depending on system
     cpu_cores: Optional[int] = (
         4  # # Limit to 2 cores for Raspberry Pi, None to use all available cores
@@ -116,20 +118,21 @@ class AgentConfig:
     gpu: Optional[str] = None  # GPU model (if available)
 
     # STT settings
-    stt_engine: STTBackend = STTBackend.WHISPER
+    stt_engine: STTBackend = STTBackend(config.stt.engine)
 
-    whisper_model_size: str = "base"  # tiny, base, small, medium
-    whisper_download_root: str = os.path.join(os.path.expanduser("~"), ".cache/whisper")
-    translate: bool = False  # Set to True to translate to English, False to transcribe in original language
-    language: str = "en"  # if english else "fr"  # Language code for Whisper
-    faster_whisper_model_size: str = "base"  # medium.en, small, large_v3
-    faster_whisper_download_root: str = os.path.join(
-        os.path.expanduser("~"), ".cache/huggingface"
+    stt_model_size: str = config.stt.model_size
+    stt_download_root: str = str(config.stt.download_path)
+    stt_translate: bool = (
+        False  # False to transcribe in original language
+        # True to stt_translate to English
     )
+    stt_language: str = config.stt.language
+    faster_stt_model_size: str = config.stt.model_size
+    faster_stt_download_root: str = str(config.paths.models_path / "huggingface")
     vosk_model_path: str = default_vosk_model_path
 
     # TTS settings
-    piper_model_path: str = defaultpiper_model_path
+    tts_model_path: str = str(config.tts.full_model_path)
     synthesis_config: SynthesisConfig = field(
         default_factory=lambda: SynthesisConfig(
             volume=0.5,  # half as loud
@@ -147,10 +150,10 @@ class AgentConfig:
         # else use SoundDevice for TTS playback with Python API
     )
     # VAD settings
-    min_speech_duration_ms: int = 250
-    min_silence_duration_ms: int = 500
-    silence_timeout_seconds: int = 3
-    max_recording_seconds: int = 15
+    min_speech_duration_ms: int = int(config.vad.min_speech_duration_ms)
+    min_silence_duration_ms: int = int(config.vad.min_silence_duration_ms)
+    silence_timeout_seconds: int = int(config.vad.silence_timeout_seconds)
+    max_recording_seconds: int = int(config.vad.max_recording_seconds)
 
     # Low energy audio handling
     display_low_energy_warning: bool = True
@@ -159,7 +162,8 @@ class AgentConfig:
 # ==================== AUDIO UTILITIES ====================
 # Audio processing utilities
 # Note: These utilities help with audio validation, conversion, and playback
-# They ensure robust handling of audio data to prevent issues during STT and TTS processing
+# They ensure robust handling of audio data to prevent issues during
+# STT and TTS processing
 # They can be extended as needed for additional audio formats or processing
 # Example: Adding noise floor, normalizing audio, etc.
 class AudioUtils:
@@ -221,7 +225,8 @@ class AudioUtils:
 
     @staticmethod
     def validate_and_clean_audio(audio_data: np.ndarray) -> np.ndarray:
-        """Enhanced validation and cleaning of audio data to prevent Whisper numerical issues"""
+        """Enhanced validation and cleaning of audio data to prevent
+        Whisper numerical issues"""
         # Convert to numpy array if not already
         audio_array = np.array(audio_data, dtype=np.float32)
 
@@ -229,7 +234,8 @@ class AudioUtils:
         if audio_array.size == 0:
             return np.array([], dtype=np.float32)
 
-        # Check for and handle invalid values (NaN, inf) - this fixes the Whisper matmul error
+        # Check for and handle invalid values (NaN, inf)
+        # This fixes the Whisper matmul error
         has_invalid = False
         if np.any(np.isnan(audio_array)):
             print("⚠️ Detected NaN values in audio, replacing with zeros")
@@ -274,9 +280,8 @@ class AudioUtils:
         audio_array = audio_array.astype(np.float32)
 
         if has_invalid:
-            print(
-                f"⚠️ Audio validation completed, RMS energy: {np.sqrt(np.mean(audio_array**2)):.6f}"
-            )
+            rms = np.sqrt(np.mean(audio_array**2))
+            print(f"⚠️ Audio validation completed, RMS energy: {rms:.6f}")
 
         return audio_array
 
@@ -297,26 +302,24 @@ class AudioUtils:
 class VADEngine:
     """Voice Activity Detection using Silero VAD"""
 
-    def __init__(self, config: AgentConfig):
+    def __init__(self, vad_config: AgentConfig):
         """Initialize VAD engine with configuration"""
-        self.config = config
+        self.config = vad_config
         self.model = load_silero_vad()
 
         if detect_raspberry_pi_model():
             limit_cpu_for_multiprocessing(self.config.cpu_cores)
-            if self.config.whisper_model_size in whisper_openai_models:
-                suffix = ".en" if self.config.language == "en" else ""
-                self.config.whisper_model_size = (
-                    f"{self.config.whisper_model_size}{suffix}"
-                )
-            if self.config.faster_whisper_model_size in faster_whisper_models:
-                suffix = ".en" if self.config.language == "en" else ""
-                self.config.faster_whisper_model_size = (
-                    f"{self.config.faster_whisper_model_size}{suffix}"
+            if self.config.stt_model_size in whisper_openai_models:
+                suffix = ".en" if self.config.stt_language == "en" else ""
+                self.config.stt_model_size = f"{self.config.stt_model_size}{suffix}"
+            if self.config.faster_stt_model_size in faster_whisper_models:
+                suffix = ".en" if self.config.stt_language == "en" else ""
+                self.config.faster_stt_model_size = (
+                    f"{self.config.faster_stt_model_size}{suffix}"
                 )
         else:
             limit_cpu_for_multiprocessing()  # Use all available cores
-            # self.config.whisper_model_size = "base" # "large-v3" # "medium" # "small" # "large-v3" # "medium" # "small" # "base" # "tiny" # Recommended model for low resources
+            self.config.stt_model_size = "base"
 
     # audio_data: np.ndarray
     def is_speech_detected(self, audio_data: np.ndarray) -> bool:
@@ -361,8 +364,8 @@ class VADEngine:
 class STTEngine:
     """Speech-to-Text processing with multiple backend support"""
 
-    def __init__(self, config: AgentConfig):
-        self.config = config
+    def __init__(self, stt_config: AgentConfig):
+        self.config = stt_config
         self.model = None
         self._initialize_model()
 
@@ -370,11 +373,11 @@ class STTEngine:
         """Initialize the selected STT model"""
         try:
             if self.config.stt_engine == STTBackend.WHISPER:
-                print(f"🧠 Loading Whisper {self.config.whisper_model_size} model...")
+                print(f"🧠 Loading Whisper {self.config.stt_model_size} model...")
                 self.model = whisper.load_model(
-                    self.config.whisper_model_size,
+                    self.config.stt_model_size,
                     device="cpu",
-                    download_root=self.config.whisper_download_root,
+                    download_root=self.config.stt_download_root,
                 )
                 print("✅ Whisper model loaded")
 
@@ -386,15 +389,15 @@ class STTEngine:
                 print("✅ Vosk model loaded")
 
             elif self.config.stt_engine == STTBackend.FASTER_WHISPER:
-                print(
-                    f"🧠 Loading Faster Whisper {self.config.faster_whisper_model_size} model..."
-                )
+                model_size = self.config.faster_stt_model_size
+                print(f"🧠 Loading Faster Whisper {model_size} model...")
                 self.model = WhisperModel(
-                    self.config.faster_whisper_model_size,
+                    model_size=self.config.faster_stt_model_size,
                     device="cpu",
-                    compute_type="int8",  # Use int8 for lower memory usage, float16 if you have a compatible GPU
+                    compute_type="int8",  # Use int8 for lower memory usage,
+                    # float16 if you have a compatible GPU
                     num_workers=4,
-                    download_root=self.config.faster_whisper_download_root,
+                    download_root=self.config.faster_stt_download_root,
                 )
                 print("✅ Faster Whisper model loaded")
 
@@ -449,7 +452,7 @@ class STTEngine:
                 segments, _ = self.model.transcribe(
                     clean_audio,
                     multilingual=False,
-                    language=self.config.language,
+                    language=self.config.stt_language,
                     beam_size=1,  # Fast inference
                     best_of=1,  # Faster inference
                     condition_on_previous_text=False,
@@ -466,8 +469,8 @@ class STTEngine:
                     clean_audio,
                     word_timestamps=True,
                     fp16=False,
-                    language=self.config.language,
-                    task="translate" if self.config.translate else "transcribe",
+                    language=self.config.stt_language,
+                    task="stt_translate" if self.config.stt_translate else "transcribe",
                 )
             # Extract text from result
             # Handle different return formats from different Whisper versions
@@ -484,10 +487,6 @@ class STTEngine:
                     if hasattr(result, "segments")
                     else result
                 )
-
-            # Debug: log result type for troubleshooting
-            # print(f"🔍 Debug: result type: {type(result)}, segments type: {type(segments)}")
-
             # Extract and clean text
             text_segments = []
             if segments:
@@ -530,17 +529,17 @@ class STTEngine:
 class TTSEngine:
     """Text-to-Speech using Piper"""
 
-    def __init__(self, config: AgentConfig):
-        self.config = config
+    def __init__(self, tts_config: AgentConfig):
+        self.config = tts_config
         self._validate_piper_model()
 
     def _validate_piper_model(self):
         """Validate Piper model exists"""
-        if not os.path.exists(self.config.piper_model_path):
-            print(f"⚠️ Piper model not found: {self.config.piper_model_path}")
+        if not os.path.exists(self.config.tts_model_path):
+            print(f"⚠️ Piper model not found: {self.config.tts_model_path}")
             print("Download from: https://huggingface.co/rhasspy/piper-voices")
         # Create a Piper object
-        self.voice = PiperVoice.load(self.config.piper_model_path)
+        self.voice = PiperVoice.load(self.config.tts_model_path)
 
     def _synthesize_voice_to_wav(self, text, output_file):
         """Synthesizes text to audio, saves it and plays."""
@@ -553,7 +552,7 @@ class TTSEngine:
                 cmd = [
                     "piper",
                     "--model",
-                    self.config.piper_model_path,
+                    self.config.tts_model_path,
                     "--text",
                     text,
                     "--output_file",
@@ -634,9 +633,9 @@ class AIResponseEngine:
     Currently uses simple intent matching, but designed for easy AI integration
     """
 
-    def __init__(self, config: AgentConfig = None):
+    def __init__(self, ai_config: AgentConfig = None):
         # Allow optional config injection; create default if not provided
-        self.config = config if config is not None else AgentConfig()
+        self.config = ai_config if ai_config is not None else AgentConfig()
 
         # Precompute dynamic time/date strings to keep lines short
         time_str = datetime.datetime.now().strftime("%I:%M %p")
@@ -666,13 +665,11 @@ class AIResponseEngine:
 
     def generate_response(self, user_input: str) -> Tuple[str, bool]:
         """
-        Generate AI response to user input
-
-        Args:
-            user_input: Transcribed user speech
-
+                Generate AI response to user input
+                Args:
+                    user_input: Transcribed user speech
         Returns:
-            Tuple of (response_text, should_continue_listening)
+                    Tuple of (response_text, should_continue_listening)
         """
         user_input = user_input.lower().strip()
         if not user_input:
@@ -700,7 +697,7 @@ class AIResponseEngine:
             "I'm still learning how to respond to that."
         )
 
-    # TODO: Replace this method with your AI model integration
+    # Replace this method with your AI model integration
     def generate_ai_response(self, user_input: str, _context: Dict = None) -> str:
         """
         EXTENSION POINT: Integrate your AI model here
@@ -710,11 +707,9 @@ class AIResponseEngine:
         - Local LLM inference (Llama, Mistral, etc.)
         - HuggingFace transformers
         - Custom trained models
-
         Args:
             user_input: User's spoken text
             context: Optional conversation context
-
         Returns:
             AI generated response text
         """
@@ -732,19 +727,17 @@ class AIResponseEngine:
 # It manages the main loop for listening, processing, and responding to voice commands
 # It can be extended with additional features such as logging, multi-threading, etc.
 # Example: Adding command history, user profiles, etc.
-
-
 class VoiceAgent:
     """Main voice agent orchestrating all components"""
 
-    def __init__(self, config: AgentConfig):
-        self.config = config
+    def __init__(self, agent_config: AgentConfig):
+        self.config = agent_config
         # Initialize components
         print("🚀 Initializing Voice Agent...")
-        self.vad_engine = VADEngine(config)
-        self.stt_engine = STTEngine(config)
-        self.tts_engine = TTSEngine(config)
-        self.ai_engine = AIResponseEngine(self.config)
+        self.vad_engine = VADEngine(agent_config)
+        self.stt_engine = STTEngine(agent_config)
+        self.tts_engine = TTSEngine(agent_config)
+        self.ai_engine = AIResponseEngine(agent_config)
 
         # Audio setup
         self.audio = pyaudio.PyAudio()
@@ -761,7 +754,7 @@ class VoiceAgent:
         print("🎤 Voice Agent starting...")
         print(f"🎯 Wake word: '{self.config.wake_word}'")
         print(f"🧠 STT Engine: {self.config.stt_engine.value}")
-        print(f"🔊 TTS Model: {self.config.piper_model_path}")
+        print(f"🔊 TTS Model: {self.config.tts_model_path}")
 
         self._setup_audio_stream()
         self._main_loop()
@@ -795,14 +788,14 @@ class VoiceAgent:
                     if "pulse" in name_l or "default" in name_l:
                         device_index = i
                         print(
-                            f"🎤 Using audio device {i}: {device_name} (channels: {max_input_channels})"
+                            f"🎤 Using audio device {i}: {name_l} (channels: {max_input_channels})"
                         )
                         break
                     elif device_index is None:
                         # Use first available input device as fallback
                         device_index = i
                         print(
-                            f"🎤 Fallback audio device {i}: {device_name} (channels: {max_input_channels})"
+                            f"🎤 Fallback audio device {i}: {name_l} (channels: {max_input_channels})"
                         )
 
         except (OSError, ValueError) as e:
@@ -847,7 +840,7 @@ class VoiceAgent:
     def _main_loop(self):
         """Main processing loop"""
         audio_buffer = []
-        print("🟢 Ready! Say '{}' to activate...".format(self.config.wake_word.upper()))
+        print(f"🟢 Ready! Say '{self.config.wake_word.upper()}' to activate...")
 
         try:
             while self.is_listening:
@@ -962,38 +955,44 @@ class VoiceAgent:
 # Note: This section initializes the configuration and starts the voice agent
 # Modify the configuration as needed before running
 # Example: Changing wake word, STT engine, TTS model, etc.
-
-
 def main():
     """Main entry point"""
     # Configuration
-    config = AgentConfig(
+    vadconfig = AgentConfig(
         wake_word="thanos",  # Change to your desired wake word
         stt_engine=STTBackend.FASTER_WHISPER,  # or STTBackend.WHISPER
         vosk_model_path=os.path.join(vosk_cache_dir, "vosk-model-small-en-us-0.15"),
-        language="en",
+        stt_language="en",
         # tiny for speed, base for accuracy
-        whisper_model_size="tiny",
+        stt_model_size="tiny",
         # use 'medium.en' for better accuracy, 'base' for speed
-        faster_whisper_model_size="tiny",
-        piper_model_path=os.path.join(DATA_DIR, "jarvis-medium.onnx"),
+        faster_stt_model_size="tiny",
+        faster_stt_download_root=os.path.join(CACHE_DIR, "huggingface"),
+        tts_model_path=os.path.join(DATA_DIR, "jarvis-medium.onnx"),
         tts_to_cli=True,
     )
 
-    # Create and start agent
-    agent = VoiceAgent(config)
-
     try:
+        # Create and start agent
+        agent = VoiceAgent(vadconfig)
         agent.start()
+    except ImportError as e:
+        print(f"❌ Required dependency missing: {e}")
+        print(
+            "💡 Please ensure all dependencies are installed: \n"
+            "pip install -r requirements.txt"
+        )
+    except FileNotFoundError as e:
+        print(f"❌ Model or file not found: {e}")
+        print("💡 Check your model paths in config.yaml or AgentConfig")
+    except RuntimeError as e:
+        print(f"❌ Engine runtime error: {e}")
+        print("💡 This might be due to incompatible hardware or corrupted models")
     except (KeyboardInterrupt, SystemExit):
         print("\n👋 Goodbye!")
-    except Exception as e:
-        print(f"❌ Unexpected error: {e}")
-        # Optional: log the full traceback for debugging
-        # import traceback
-        # traceback.print_exc()
     finally:
-        agent.stop()
+        if "agent" in locals():
+            agent.stop()
 
 
 if __name__ == "__main__":
