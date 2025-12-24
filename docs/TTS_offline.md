@@ -67,7 +67,7 @@ pip install piper-tts
 2.1 The model file (e.g., **`model-name.onnx`**)
 2.2 The configuration file (**`model-name.onnx.json`**)
 
-Those models are available on the **Piper repository on Hugging Face**. For French and English GB voices, you can use models like these (names may change):
+Those models are available on the **Piper repository on Hugging Face** [Link](https://huggingface.co/rhasspy/piper-voices/tree/main). For French and English GB voices, you can use models like these (names may change):
 
 **French**: `fr_FR-gilles-low.onnx` and `fr_FR-gilles-low.onnx.json`
 **English (GB)**: `en_GB-vctk-medium.onnx` and `en_GB-vctk-medium.onnx.json`

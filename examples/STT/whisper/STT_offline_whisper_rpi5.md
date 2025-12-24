@@ -43,8 +43,8 @@ pip3 install jiwer scipy pytest
 Load models, vocabulary and encoder files to be able to use whisper offline with the following script:
 
 ```bash
-chmod +x  whisper_objects.sh
-./whisper_objects.sh
+cd ~/AI-Autonomous-Assistant/scripts/models/audio
+python3 whisper_objects.py
 ```
 
 The vocabulary, encoder and models files will be store in ($HOME_USER_DIR)/.cache/whisper
