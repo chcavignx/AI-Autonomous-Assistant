@@ -26,41 +26,29 @@ sudo apt update && sudo apt install -y ffmpeg python3 python3-pip git portaudio1
 pip3 install git+https://github.com/openai/whisper.git
 pip3 install blobfile
 ```
+To manage resource constraints on the Raspberry Pi 5, it is recommended to use smaller Whisper models. Download and cache the necessary models, vocabulary, and encoder files for offline use with the following script:
 
-Alternatively, you can clone it:
-
-```bash
-git clone https://github.com/openai/whisper.git
-cd whisper
-pip3 install -e .
-```
-and Install modules to execute tests into whisper repository
+Set REPO_ROOT to your cloned main repository path before running (e.g. /Users/USER_NAME/AI-Autonomous-Assistant).
 
 ```bash
-pip3 install jiwer scipy pytest
-```
-
-Load models, vocabulary and encoder files to be able to use whisper offline with the following script:
-
-```bash
-cd ~/AI-Autonomous-Assistant/scripts/models/audio
+cd $REPO_ROOT/scripts/models/audio
 python3 whisper_objects.py
 ```
 
-The vocabulary, encoder and models files will be store in ($HOME_USER_DIR)/.cache/whisper
+The vocabulary, encoder and models files will be store in $REPO_ROOT/cache/models/whisper
 
 3. SpeechRecognition:
 
 Follow installation from <https://github.com/Uberi/speech_recognition.git>
 Mainly:
 Update file links in your local copy of openai_public.py which will be installed in your python folder e.g. /lib/python3.11/site-packages/tiktoken_ext/openai_public.py to point to where you downloaded the files.
-Remove the URL "<https://openaipublic.blob.core.windows.net/gpt-2/encodings/main/>" and replace it with your local copy, e.g. "($HOME_USER_DIR)/.cache/whisper/vocab.bpe" and "($HOME_USER_DIR).cache/whisper/encoder.json"
+Remove the URL "<https://openaipublic.blob.core.windows.net/gpt-2/encodings/main/>" and replace it with your local copy, e.g. "$REPO_ROOT/cache/models/whisper/vocab.bpe" and "$REPO_ROOT/cache/models/whisper/encoder.json"
 
 ```bash
 def gpt2():
     mergeable_ranks = data_gym_to_mergeable_bpe_ranks(
-        vocab_bpe_file="/$HOME/.cache/whisper/vocab.bpe",
-        encoder_json_file="/$HOME/.cache/whisper/encoder.json",
+        vocab_bpe_file="$REPO_ROOT/cache/models/whisper/vocab.bpe",
+        encoder_json_file="$REPO_ROOT/cache/models/whisper/encoder.json",
     )
 ```
 
@@ -105,7 +93,7 @@ Secondly load models and data sets from:
 <https://huggingface.co/datasets/distil-whisper/librispeech_long>
 
 
-with the following python script that will store the model and data set in ($HOME_USER_DIR)/.cache/huggingface directory
+with the following python script that will store the model and data set in $REPO_ROOT/  cache/models/huggingface directory
 (following : https://huggingface.co/docs/huggingface_hub/guides/download)
 
 ```bash
