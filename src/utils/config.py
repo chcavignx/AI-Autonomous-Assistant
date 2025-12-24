@@ -1,4 +1,7 @@
 # !/usr/bin/env python3
+"""
+Configuration for the voice agent.
+"""
 
 import sys
 from pathlib import Path
