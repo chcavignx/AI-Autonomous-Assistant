@@ -46,6 +46,7 @@ GPT2 = [
 
 
 def download_file(url: str, target_dir: str, filename: str = None) -> None:
+    """Downloads a file from a URL to a target directory."""
     if not filename:
         filename = url.split("/")[-1]
 
@@ -110,7 +111,9 @@ def download_file(url: str, target_dir: str, filename: str = None) -> None:
         print(f"A file system error occurred: {e}")
 
 
-def run():
+def run() -> None:
+    """Downloads and saves Whisper models, tokenizers, processors,
+    and their associated datasets to a local backup in your user cache directory."""
     print(f"Target directory: {cache_dir}")
 
     try:
@@ -121,7 +124,10 @@ def run():
                 continue
             print(f"Downloading {model_name} via whisper.load_model...")
             whisper.load_model(model_name, download_dir=cache_dir)
-    except RuntimeError:
+    except RuntimeError as e:
+        print(
+            f"Whisper library download failed: {e}. Falling back to manual download..."
+        )
         for model_name, model_url in MODELS.items():
             download_file(model_url, cache_dir, filename=f"{model_name}.pt")
 
