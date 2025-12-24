@@ -2,10 +2,10 @@
 
 import os
 
-from utils import config
+from utils.config import setup_python_path, load_config
 
-config.setup_python_path()
-config = config.load_config()
+setup_python_path()
+config = load_config()
 
 PIPER_DIR = "models/piper"
 
