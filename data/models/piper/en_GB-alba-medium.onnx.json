@@ -1,7 +1,7 @@
 {
   "audio": {
-    "sample_rate": 16000,
-    "quality": "low"
+    "sample_rate": 22050,
+    "quality": "medium"
   },
   "espeak": {
     "voice": "en-gb-x-rp"
@@ -11,6 +11,7 @@
     "length_scale": 1,
     "noise_w": 0.8
   },
+  "phoneme_type": "espeak",
   "phoneme_map": {},
   "phoneme_id_map": {
     "_": [
@@ -402,12 +403,84 @@
     ],
     "ⱱ": [
       129
+    ],
+    "0": [
+      130
+    ],
+    "1": [
+      131
+    ],
+    "2": [
+      132
+    ],
+    "3": [
+      133
+    ],
+    "4": [
+      134
+    ],
+    "5": [
+      135
+    ],
+    "6": [
+      136
+    ],
+    "7": [
+      137
+    ],
+    "8": [
+      138
+    ],
+    "9": [
+      139
+    ],
+    "̧": [
+      140
+    ],
+    "̃": [
+      141
+    ],
+    "̪": [
+      142
+    ],
+    "̯": [
+      143
+    ],
+    "̩": [
+      144
+    ],
+    "ʰ": [
+      145
+    ],
+    "ˤ": [
+      146
+    ],
+    "ε": [
+      147
+    ],
+    "↓": [
+      148
+    ],
+    "#": [
+      149
+    ],
+    "\"": [
+      150
+    ],
+    "↑": [
+      151
+    ],
+    "̺": [
+      152
+    ],
+    "̻": [
+      153
     ]
   },
-  "num_symbols": 130,
+  "num_symbols": 256,
   "num_speakers": 1,
   "speaker_id_map": {},
-  "piper_version": "0.2.0",
+  "piper_version": "1.0.0",
   "language": {
     "code": "en_GB",
     "family": "en",
@@ -416,5 +489,5 @@
     "name_english": "English",
     "country_english": "Great Britain"
   },
-  "dataset": "alan"
+  "dataset": "alba"
 }

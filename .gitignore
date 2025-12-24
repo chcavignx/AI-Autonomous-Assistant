@@ -35,7 +35,6 @@ ENV/
 *.code-workspace
 
 # Models (large files)
-models/*.onnx
 models/*.pt
 models/*.hef
 models/*.har
@@ -50,7 +49,6 @@ models/*.tar
 node_modules/
 
 # Dataset
-data/
 cache/
 
 # Temporary files
@@ -70,3 +68,6 @@ htmlcov/
 
 # Documentation builds
 docs/_build/
+
+# Environment variables
+.env
