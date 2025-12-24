@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+"""Script to download and save Hugging Face models, tokenizers, processors,
+and their associated datasets to a local backup in your user cache directory."""
+
 import os
 
 from huggingface_hub import snapshot_download

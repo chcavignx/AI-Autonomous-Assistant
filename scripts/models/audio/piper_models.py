@@ -1,8 +1,9 @@
 # !/usr/bin/env python3
+"""Script to move data from data/models/piper to cache/models/piper"""
 
 import os
 
-from utils.config import setup_python_path, load_config
+from utils.config import load_config, setup_python_path
 
 setup_python_path()
 config = load_config()
