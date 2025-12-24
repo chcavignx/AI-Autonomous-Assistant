@@ -536,8 +536,10 @@ class TTSEngine:
     def _validate_piper_model(self):
         """Validate Piper model exists"""
         if not os.path.exists(self.config.tts_model_path):
-            print(f"⚠️ Piper model not found: {self.config.tts_model_path}")
-            print("Download from: https://huggingface.co/rhasspy/piper-voices")
+            raise FileNotFoundError(
+                f"Piper model not found: {self.config.tts_model_path}\n"
+                "Download from: https://huggingface.co/rhasspy/piper-voices"
+            )
         # Create a Piper object
         self.voice = PiperVoice.load(self.config.tts_model_path)
 

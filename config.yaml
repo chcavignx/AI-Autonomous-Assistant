@@ -14,13 +14,13 @@ stt:
   language: "en"
   transformers: false
   transformers_engine: "huggingface"
-  download_root: "cache/models/{transformers_engine if transformers else engine}/"
+  # download_root: null  # Let Python code build the path dynamically
 
 # Text-to-Speech configuration
 tts:
   engine: "piper"
   model_name: "jarvis-medium.onnx"
-  model_path: "cache/models/{engine}/{model_name}"
+  # model_path: null  # Let Python code build the path dynamically
   cli_mode: false
 
 # Voice Activity Detection configuration
