@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+"""
+Downloads and extracts Vosk models.
+"""
+
 import os
 import zipfile
 
@@ -16,7 +21,8 @@ cache_dir = os.path.join(os.path.expanduser("~"), "cache/models/vosk")
 os.makedirs(cache_dir, exist_ok=True)
 
 
-def download_and_extract(model_name, url):
+def download_and_extract(model_name, url) -> None:
+    """Downloads and extracts a Vosk model."""
     filename = os.path.basename(url)
     filepath = os.path.join(cache_dir, filename)
     print(f"Downloading {model_name} model...")
@@ -40,7 +46,8 @@ def download_and_extract(model_name, url):
     print(f"Removed {filename}")
 
 
-def run():
+def run() -> None:
+    """Downloads and extracts all Vosk models."""
     for model_name, url in MODELS.items():
         print(f"Processing {model_name}...")
         if model_exists(model_name, cache_dir):
