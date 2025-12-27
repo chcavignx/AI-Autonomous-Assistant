@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+Downloads and saves Hugging Face models, tokenizers, processors,
+and their associated datasets to a local backup in your user cache directory.
+"""
+
 import os
 
 from huggingface_hub import snapshot_download

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-
+"""
+Downloads and saves Hugging Face models, tokenizers, processors,
+and their associated datasets to a local backup in your user cache directory.
+"""
 
 import os
 import urllib.error
