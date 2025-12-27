@@ -22,7 +22,7 @@ def download_and_extract(model_name, url):
     print(f"Downloading {model_name} model...")
 
     # Download the file
-    with requests.get(url, stream=True) as r:
+    with requests.get(url, stream=True, timeout=30) as r:
         r.raise_for_status()
         with open(filepath, "wb") as f:
             for chunk in r.iter_content(chunk_size=8192):
