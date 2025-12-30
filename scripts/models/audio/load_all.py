@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Script to load all models."""
 
+import sys
+import traceback
+
 import fast_whisper_objects
 import load_huggingface_objects
 import piper_models
@@ -14,24 +17,39 @@ def main() -> None:
     print("🚀 Starting Master Model Loading Process")
     print("==================================================")
 
-    print("\n--- Phase 1: Whisper Models ---")
-    whisper_objects.run()
+    phases = [
+        ("Whisper Models", whisper_objects.run),
+        ("Fast Whisper Models", fast_whisper_objects.run),
+        ("Hugging Face Objects", load_huggingface_objects.run),
+        ("Vosk Models", vosk_models.run),
+        ("Piper Models", piper_models.run),
+    ]
 
-    print("\n--- Phase 2: Fast Whisper Models ---")
-    fast_whisper_objects.run()
+    failed_phases = []
+    success_count = 0
 
-    print("\n--- Phase 3: Hugging Face Objects ---")
-    load_huggingface_objects.run()
-
-    print("\n--- Phase 4: Vosk Models ---")
-    vosk_models.run()
-
-    print("\n--- Phase 5: Piper Models ---")
-    piper_models.run()
+    for name, run_func in phases:
+        print(f"\n--- Phase {success_count + len(failed_phases) + 1}: {name} ---")
+        try:
+            run_func()
+            success_count += 1
+        except Exception:  # pylint: disable=broad-except
+            # We catch the general Exception here to ensure that a failure in one
+            # model loading phase doesn't prevent other phases from running.
+            print(f"❌ Error in phase '{name}':")
+            print(traceback.format_exc())
+            failed_phases.append(name)
 
     print("\n==================================================")
-    print("✅ All model loading tasks completed!")
-    print("==================================================")
+    print("📋 Final Summary")
+    print(f"✅ Successful phases: {success_count}/{len(phases)}")
+    if failed_phases:
+        print(f"❌ Failed phases: {', '.join(failed_phases)}")
+        print("==================================================")
+        sys.exit(1)
+    else:
+        print("✅ All model loading tasks completed successfully!")
+        print("==================================================")
 
 
 if __name__ == "__main__":
