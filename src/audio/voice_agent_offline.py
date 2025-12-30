@@ -65,7 +65,6 @@ warnings.filterwarnings(
     "ignore", category=RuntimeWarning, module="faster_whisper.feature_extractor"
 )
 
-
 # ==================== CONFIGURATION CLASSES ====================
 DATA_DIR = str(config.paths.data_path)
 CACHE_DIR = str(config.paths.cache_path)
