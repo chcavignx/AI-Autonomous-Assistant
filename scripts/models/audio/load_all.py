@@ -12,7 +12,11 @@ import whisper_objects
 
 
 def main() -> None:
-    """Function to load all models"""
+    """
+    Orchestrates loading of all audio-related models in a fixed sequence.
+
+    Prints progress banners for each phase and invokes the model-loading routines for Whisper, Fast Whisper, Hugging Face objects, Vosk, and Piper in order.
+    """
     print("==================================================")
     print("🚀 Starting Master Model Loading Process")
     print("==================================================")
