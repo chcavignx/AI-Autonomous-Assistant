@@ -32,7 +32,7 @@ cache_dir = os.path.join(os.path.expanduser("~"), "cache/models/huggingface")
 def get_models_to_download() -> tuple:
     """
     Select which Hugging Face model identifiers should be downloaded for the current platform.
-    
+
     Returns:
         tuple: Tuple of model identifier strings — on Raspberry Pi this is the base models tuple, otherwise the base models concatenated with the extended models tuple.
     """
@@ -45,7 +45,7 @@ def get_models_to_download() -> tuple:
 def run() -> None:
     """
     Download the selected Hugging Face models and store them in the user's local cache.
-    
+
     Selects models appropriate for the current platform, skips models that are already present in the cache, downloads any missing models into the configured cache directory, and prints progress messages for each model.
     """
     models_to_download = get_models_to_download()
