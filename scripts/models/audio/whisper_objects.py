@@ -45,7 +45,12 @@ GPT2 = [
 
 
 def get_models_to_download() -> dict:
-    """Get the dictionary of models to download based on platform."""
+    """
+    Selects the set of Whisper model download mappings appropriate for the current platform.
+    
+    Returns:
+        dict: Mapping of model names to their download URLs. On Raspberry Pi systems returns `MODELS_BASE`; on other platforms returns a merged mapping of `MODELS_BASE` and `MODELS_EXTENDED`.
+    """
     # Add larger models if not on Raspberry Pi
     if not detect_raspberry_pi_model():
         return {**MODELS_BASE, **MODELS_EXTENDED}
@@ -53,7 +58,16 @@ def get_models_to_download() -> dict:
 
 
 def download_file(url: str, target_dir: str, filename: str = None) -> None:
-    """Downloads a file from a URL to a target directory."""
+    """
+    Download a file from a URL into a target directory, skipping or resuming as appropriate.
+    
+    Checks for an existing model/file using `model_exists` and skips download if present. Ensures the target directory exists (resolving symlinks), then downloads the URL to the given filename (defaults to the URL's final path segment). If a partial file is present, attempts to resume using HTTP Range requests; if the server does not support resuming, restarts the download. Handles HTTP 416 as an already-complete file and reports network or filesystem errors via printed messages.
+    
+    Parameters:
+        url (str): The source URL of the file to download.
+        target_dir (str): Directory path where the file will be saved; created if missing.
+        filename (str, optional): Filename to use for the saved file. Defaults to the last path segment of `url`.
+    """
     if not filename:
         filename = url.split("/")[-1]
 
@@ -119,8 +133,11 @@ def download_file(url: str, target_dir: str, filename: str = None) -> None:
 
 
 def run() -> None:
-    """Downloads and saves Whisper models, tokenizers, processors,
-    and their associated datasets to a local backup in your user cache directory."""
+    """
+    Download Whisper models and related tokenizer and processor files into the module cache directory.
+    
+    Uses the whisper library to fetch models returned by get_models_to_download and saves them under cache_dir; if the library download fails, falls back to manually downloading model weight files. Also downloads configured GPT-2 support files into the same cache location.
+    """
     print(f"Target directory: {cache_dir}")
 
     models_to_download = get_models_to_download()

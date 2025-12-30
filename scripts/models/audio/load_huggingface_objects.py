@@ -23,8 +23,11 @@ cache_dir = os.path.join(os.path.expanduser("~"), "cache/models/huggingface")
 
 
 def run() -> None:
-    """Downloads and saves Hugging Face models, tokenizers, processors,
-    and their associated datasets to a local backup in your user cache directory."""
+    """
+    Download and save configured Hugging Face models, tokenizers, processors, and datasets to the local user cache.
+    
+    This function iterates over the module-level `model_names` and `data_set_names`, skipping entries already present in `cache_dir`. For each missing repository it attempts to download a snapshot into `cache_dir` and prints progress and completion messages. If a repository is not found or is gated, it prints a corresponding message and continues with the next item.
+    """
     # repo_type="model" if None is by default "model" - Not mandatory but for clarity
     for model_name in model_names:
         if model_exists(model_name, cache_dir):
