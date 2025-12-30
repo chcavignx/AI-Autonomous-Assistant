@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-import wave
-import sys
 import os
-from vosk import Model, KaldiRecognizer, SetLogLevel
+import sys
+import wave
+
+from vosk import KaldiRecognizer, Model, SetLogLevel
+
+from src.utils.config import config
 
 # You can set log level to -1 to disable debug messages
 SetLogLevel(0)
@@ -21,7 +24,7 @@ if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getcomptype() != "NONE
 # model = Model(lang="en-us")
 
 
-model_name = "vosk-model-small-en-us-0.15"
+MODEL_NAME = "vosk-model-small-en-us-0.15"
 # You can also init model by name or with a folder when you have downloaded it
 # Uncomment the following line to use a specific model from HuggingFace
 # or local directory if you have already downloaded it
@@ -31,17 +34,16 @@ model_name = "vosk-model-small-en-us-0.15"
 # model = Model(model_name=model_name)
 
 # If you have already downloaded the model, you can load it like this:
-vosk_local_dir = ".cache/vosk"
-cache_dir = os.path.join(os.path.expanduser("~"), vosk_local_dir)
-local_dir = os.path.join(cache_dir, model_name)
-if not os.path.exists(local_dir):
+MODEL_DIR = str(config.paths.models_path / "vosk")
+LOCAL_DIR = os.path.join(MODEL_DIR, MODEL_NAME)
+if not os.path.exists(LOCAL_DIR):
     print(
-        f"Model {model_name} not found. Please download it from https://alphacephei.com/vosk/models"
+        f"Model {MODEL_NAME} not found. Please download it from https://alphacephei.com/vosk/models"
     )
     sys.exit(1)
 # Load the model from the local directory
-print(f"Loading model from {model_name}")
-model = Model(model_name=local_dir)
+print(f"Loading model from {MODEL_NAME}")
+model = Model(model_name=MODEL_NAME, model_path=MODEL_DIR)
 # Initialize the Kaldi recognizer with the model and sample rate
 rec = KaldiRecognizer(model, wf.getframerate())
 rec.SetWords(True)

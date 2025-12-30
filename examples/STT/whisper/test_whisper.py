@@ -5,14 +5,16 @@ import time
 
 import whisper
 
+from src.utils.config import config
 from src.utils.sysutils import (
     detect_raspberry_pi_model,
     limit_cpu_for_multiprocessing,
     print_time_usage,
 )
 
+MODEL_DIR = str(config.paths.models_path / "whisper")
 # Paths to the model and config files for French and English voices
-DATA_DIR = "../../../data/"
+DATA_DIR = str(config.paths.data_path)
 # data for english
 TEST_FILE_NAME = "jfk.flac"
 ENGLISH = True  # Set to True if the audio is in English,
@@ -42,7 +44,7 @@ else:
 print(f"Selected model: {MODEL_ID}")
 print_time_usage("After model load", start_time)
 # --- Whisper Transcription ---
-model = whisper.load_model(MODEL_ID)
+model = whisper.load_model(MODEL_ID, download_root=MODEL_DIR)
 # download_root = "~/.cache/whisper" # Optional, default is ~/.cache/whisper
 # device = "cpu"  or "cuda" if you have a GPU and the right setup
 # device = "cuda:0" if torch.cuda.is_available() else "cpu"

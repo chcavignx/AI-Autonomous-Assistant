@@ -23,12 +23,14 @@ pip3 install vosk
 
 Download models (from <https://alphacephei.com/vosk/models>) files to be able to use vosk offline with the following script:
 
-```bash
-cd ~/AI-Autonomous-Assistant/scripts/models/audio
-chmod +x  vosk_models.sh
-./vosk_models.sh
-```
+Set REPO_ROOT to your cloned main repository path before running (e.g. /Users/USER_NAME/AI-Autonomous-Assistant).
 
+```bash
+git clone https://github.com/chcavignx/AI-Autonomous-Assistant.git
+REPO_ROOT=~/AI-Autonomous-Assistant
+cd $REPO_ROOT/scripts/models/audio
+python3 vosk_models.py
+```
 
 ## testing Vosk
 
@@ -50,12 +52,11 @@ python3 ./test_simple.py test.wav
 ```
 When using your own audio file make sure it has the correct format - PCM 16khz 16bit mono. Otherwise, if you have ffmpeg installed, you can use test_ffmpeg.py, which does the conversion for you.
 
-Find more examples such as using a microphone, decoding with a fixed small vocabulary or speaker identification setup in the python/example subfolder
+Find more examples such as using a microphone, decoding with a fixed small vocabulary or speaker identification setup in the $REPO_ROOT/examples/STT/vosk/examples subfolder
 
 ## Demo App
 
 ```bash
-git clone https://github.com/chcavignx/AI-Autonomous-Assistant.git
-cd AI-Autonomous-Assistant/examples/STT/vosk
-python3 ./vosk_test_simple.py ../../../data/test.wav
+cd $REPO_ROOT/examples/STT/vosk
+python3 vosk_test_simple.py $REPO_ROOT/data/test.wav
 ```

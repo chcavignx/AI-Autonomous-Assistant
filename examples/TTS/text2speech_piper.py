@@ -9,8 +9,11 @@ import wave
 import sounddevice as sd
 from piper import PiperVoice, SynthesisConfig
 
+from src.utils.config import config
+
 # Paths to the model and config files for French and English voices
-DATA_DIR = "../../data/"
+MODEL_DIR = str(config.paths.models_path / "piper")
+DATA_DIR = str(config.paths.data_path)
 TEST_FILE_NAME = "test.wav"
 
 syn_config = SynthesisConfig(
@@ -76,25 +79,31 @@ def synthesize_voice(model_path, text):
     print("Synthesis complete.")
 
 
-# Example for the French voice
-model_fr = os.path.join(DATA_DIR, "fr_FR-gilles-low.onnx")
-text_fr = "Ceci est un test avec voix française utilisant le moteur Piper."
-text_fr += " Je m'appelle Gilles et je suis ravi de vous rencontrer."
-text_fr += " Je suis très heureux de pouvoir parler avec vous aujourd'hui."
-text_fr += " J'espère que vous apprécierez cette démonstration."
-file_fr = setup_output_filename(
-    DATA_DIR, TEST_FILE_NAME, model_fr.split("/")[-1].replace(".onnx", "")
-)
-synthesize_voice_and_save(model_fr, text_fr, file_fr)
-synthesize_voice(model_fr, text_fr)
-# Example for the English (GB) voice
-model_en = os.path.join(DATA_DIR, "jarvis-medium.onnx")
-text_en = "This is a test in British English using the Piper engine."
-text_en += " My name is Jarvis and I am delighted to meet you."
-text_en += " I am very happy to be able to speak with you today."
-text_en += " I hope you will enjoy this demonstration."
-file_en = setup_output_filename(
-    DATA_DIR, TEST_FILE_NAME, model_en.split("/")[-1].replace(".onnx", "")
-)
-synthesize_voice_and_save(model_en, text_en, file_en)
-synthesize_voice(model_en, text_en)
+def main() -> None:
+    """Main function to demonstrate text-to-speech using Piper."""
+    # Example for the French voice
+    model_fr = os.path.join(MODEL_DIR, "fr_FR-gilles-low.onnx")
+    # text_fr = "Ceci est un test avec voix française utilisant le moteur Piper."
+    text_fr = " Je m'appelle Gilles et je suis ravi de vous rencontrer."
+    text_fr += " Je suis très heureux de pouvoir parler avec vous aujourd'hui."
+    text_fr += " J'espère que vous apprécierez cette démonstration."
+    file_fr = setup_output_filename(
+        DATA_DIR, TEST_FILE_NAME, model_fr.split("/")[-1].replace(".onnx", "")
+    )
+    synthesize_voice_and_save(model_fr, text_fr, file_fr)
+    synthesize_voice(model_fr, text_fr)
+    # Example for the English (GB) voice
+    model_en = os.path.join(MODEL_DIR, "jarvis-medium.onnx")
+    # text_en = "This is a test in British English using the Piper engine."
+    text_en = " My name is Jarvis and I am delighted to meet you."
+    text_en += " I am very happy to be able to speak with you today."
+    text_en += " I hope you will enjoy this demonstration."
+    file_en = setup_output_filename(
+        DATA_DIR, TEST_FILE_NAME, model_en.split("/")[-1].replace(".onnx", "")
+    )
+    synthesize_voice_and_save(model_en, text_en, file_en)
+    synthesize_voice(model_en, text_en)
+
+
+if __name__ == "__main__":
+    main()

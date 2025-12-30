@@ -15,6 +15,7 @@ import time
 import torch
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 
+from src.utils.config import config
 from src.utils.sysutils import (
     detect_raspberry_pi_model,
     limit_cpu_for_multiprocessing,
@@ -22,7 +23,8 @@ from src.utils.sysutils import (
 )
 
 # Paths to the model and config files for French and English voices
-DATA_DIR = "../../../data/"
+MODEL_DIR = str(config.paths.models_path / "whisper")
+DATA_DIR = str(config.paths.data_path)
 TEST_FILE_NAME = "jfk.flac"
 
 
@@ -51,7 +53,7 @@ def main():
 
     audio_file = os.path.join(DATA_DIR, TEST_FILE_NAME)
 
-    cache_dir = os.path.join(os.path.expanduser("~"), ".cache/huggingface")
+    cache_dir = os.path.join(MODEL_DIR, "huggingface")
     # ----------------------
     # Model loading
     # ----------------------
