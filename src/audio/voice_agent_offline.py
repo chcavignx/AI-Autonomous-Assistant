@@ -535,7 +535,7 @@ class TTSEngine:
     def _validate_piper_model(self):
         """
         Ensure the configured Piper TTS model file exists and load it into the engine.
-        
+
         Raises:
             FileNotFoundError: If `self.config.tts_model_path` does not point to an existing file.
         """
