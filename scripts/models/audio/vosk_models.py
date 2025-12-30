@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-"""
-Downloads and extracts Vosk models.
-"""
+"""Script to download and extract Vosk speech recognition models
+to a local cache directory."""
 
 import os
 import zipfile

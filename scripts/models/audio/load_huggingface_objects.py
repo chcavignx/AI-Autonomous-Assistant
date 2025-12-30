@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""
-Downloads and saves Hugging Face models, tokenizers, processors,
-and their associated datasets to a local backup in your user cache directory.
-"""
+"""Script to download and save Hugging Face models, tokenizers, processors,
+and their associated datasets to a local backup in your user cache directory."""
 
 import os
 
 from huggingface_hub import snapshot_download
+from huggingface_hub.utils import GatedRepoError, RepositoryNotFoundError
 from models_check import model_exists
 
 model_names = (
@@ -32,9 +31,15 @@ def run() -> None:
             print(f"Model {model_name} already exists.")
             continue
         print(f"Downloading and saving {model_name} to {cache_dir}")
-
-        snapshot_download(repo_id=model_name, repo_type="model", cache_dir=cache_dir)
-        print(f"Model saved to: {os.path.join(cache_dir, model_name)}")
+        try:
+            snapshot_download(
+                repo_id=model_name, repo_type="model", cache_dir=cache_dir
+            )
+            print(f"Model saved to: {os.path.join(cache_dir, model_name)}")
+        except RepositoryNotFoundError:
+            print(f"Model {model_name} not found on Hugging Face.")
+        except GatedRepoError:
+            print(f"Model {model_name} is gated and requires authentication.")
     print("All huggingface models have been downloaded and saved.")
 
     for data_set_name in data_set_names:
@@ -43,10 +48,15 @@ def run() -> None:
             continue
         print(f"Downloading and saving {data_set_name} to {cache_dir}")
         # Load a hosted dataset
-        snapshot_download(
-            repo_id=data_set_name, repo_type="dataset", cache_dir=cache_dir
-        )
-        print(f"Data_sets saved to: {os.path.join(cache_dir, data_set_name)}")
+        try:
+            snapshot_download(
+                repo_id=data_set_name, repo_type="dataset", cache_dir=cache_dir
+            )
+            print(f"Data_sets saved to: {os.path.join(cache_dir, data_set_name)}")
+        except RepositoryNotFoundError:
+            print(f"Data_set {data_set_name} not found on Hugging Face.")
+        except GatedRepoError:
+            print(f"Data_set {data_set_name} is gated and requires authentication.")
     print("All data_sets have been downloaded and saved.")
 
 
