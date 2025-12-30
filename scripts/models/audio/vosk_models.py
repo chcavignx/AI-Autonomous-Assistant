@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Script to download and save Hugging Face models, tokenizers, processors,
-and their associated datasets to a local backup in your user cache directory."""
+"""Script to download and extract Vosk speech recognition models
+to a local cache directory."""
 
 import os
 import zipfile
