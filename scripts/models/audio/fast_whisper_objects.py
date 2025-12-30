@@ -7,6 +7,7 @@ import os
 from huggingface_hub import snapshot_download
 from models_check import model_exists
 
+from src.utils.config import config
 from src.utils.sysutils import detect_raspberry_pi_model
 
 MODELS_NAMES_BASE = (
@@ -26,7 +27,7 @@ MODELS_NAMES_EXTENDED = (
     "Systran/faster-distil-whisper-large-v3",
 )
 
-cache_dir = os.path.join(os.path.expanduser("~"), "cache/models/huggingface")
+CACHE_DIR = str(config.paths.models_path / "huggingface")
 
 
 def get_models_to_download() -> tuple:
@@ -50,13 +51,13 @@ def run() -> None:
     """
     models_to_download = get_models_to_download()
     for model_name in models_to_download:
-        if model_exists(model_name, cache_dir):
+        if model_exists(model_name, CACHE_DIR):
             print(f"Model {model_name} already exists.")
             continue
-        print(f"Downloading and saving {model_name} to {cache_dir}")
+        print(f"Downloading and saving {model_name} to {CACHE_DIR}")
 
-        snapshot_download(repo_id=model_name, repo_type="model", cache_dir=cache_dir)
-        print(f"Model saved to: {os.path.join(cache_dir, model_name)}")
+        snapshot_download(repo_id=model_name, repo_type="model", cache_dir=CACHE_DIR)
+        print(f"Model saved to: {os.path.join(CACHE_DIR, model_name)}")
     print("All fast-whisper models have been downloaded and saved.")
 
 

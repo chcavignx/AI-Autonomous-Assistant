@@ -2,7 +2,6 @@
 """Script to download and save Hugging Face models, tokenizers, processors,
 and their associated datasets to a local backup in your user cache directory."""
 
-import os
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -10,12 +9,12 @@ from pathlib import Path
 import whisper
 from models_check import model_exists
 
+from src.utils.config import config
 from src.utils.sysutils import detect_raspberry_pi_model
 
 # Define the target directory
-cache_dir = os.path.join(os.path.expanduser("~"), "cache/models/whisper")
+CACHE_DIR = str(config.paths.models_path / "whisper")
 
-# Base models for all platforms (including Raspberry Pi)
 MODELS_BASE = {
     "tiny.en": "https://openaipublic.azureedge.net/main/whisper/models/d3dd57d32accea0b295c96e26691aa14d8822fac7d9d27d5dc00b4ca2826dd03/tiny.en.pt",
     "tiny": "https://openaipublic.azureedge.net/main/whisper/models/65147644a518d12f04e32d6f3b26facc3f8dd46e5390956a9424a650c0ce22b9/tiny.pt",
@@ -103,7 +102,7 @@ def download_file(url: str, target_dir: str, filename: str = None) -> None:
         req.add_header("Range", f"bytes={downloaded}-")
 
     try:
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=30) as response:
             # Check if server supports partial content
             if downloaded > 0 and response.status == 206:
                 mode = "ab"
@@ -114,7 +113,7 @@ def download_file(url: str, target_dir: str, filename: str = None) -> None:
             else:
                 mode = "wb"
 
-            with open(file_path, mode) as f:
+            with file_path.open(mode) as f:
                 while True:
                     chunk = response.read(8192)
                     if not chunk:
@@ -138,28 +137,25 @@ def run() -> None:
 
     Uses the whisper library to fetch models returned by get_models_to_download and saves them under cache_dir; if the library download fails, falls back to manually downloading model weight files. Also downloads configured GPT-2 support files into the same cache location.
     """
-    print(f"Target directory: {cache_dir}")
+    print(f"Target directory: {CACHE_DIR}")
 
     models_to_download = get_models_to_download()
     try:
         print("Using whisper library to download models...")
         for model_name, model_url in models_to_download.items():
-            if model_exists(model_name, cache_dir):
+            if model_exists(model_name, CACHE_DIR):
                 print(f"Model {model_name} already exists.")
                 continue
             print(f"Downloading {model_name} via whisper.load_model...")
-            whisper.load_model(model_name, download_dir=cache_dir)
-    except RuntimeError as e:
-        print(
-            f"Whisper library download failed: {e}. Falling back to manual download..."
-        )
+            whisper.load_model(model_name, download_dir=CACHE_DIR)
+    except RuntimeError:
         for model_name, model_url in models_to_download.items():
-            download_file(model_url, cache_dir, filename=f"{model_name}.pt")
+            download_file(model_url, CACHE_DIR, filename=f"{model_name}.pt")
 
     for url in GPT2:
-        download_file(url, cache_dir)
+        download_file(url, CACHE_DIR)
 
-    print(f"✅ All whisper models have been downloaded into {cache_dir}")
+    print(f"✅ All whisper models have been downloaded into {CACHE_DIR}")
 
 
 if __name__ == "__main__":
