@@ -7,25 +7,50 @@ paths:
   cache: ".cache"
   models: "models"
 
-# Speech-to-Text configuration
-stt:
-  engine: "whisper" # whisper, vosk, faster_whisper
-  model_size: "tiny"
-  language: "en"
-  transformers: false
-  transformers_engine: "huggingface"
-  # download_root: null  # Let Python code build the path dynamically
-
 # Text-to-Speech configuration
 tts:
   engine: "piper"
   model_name: "jarvis-medium.onnx"
   # model_path: null  # Let Python code build the path dynamically
   cli_mode: false
+  speed: 1.0
+  volume: 1.0
 
-# Voice Activity Detection configuration
 vad:
   min_speech_duration_ms: 250
   min_silence_duration_ms: 500
   silence_timeout_seconds: 3
-  max_recording_seconds: 15
+  max_recording_seconds: 10
+  threshold: 0.5
+
+# Automatic Speech Recognition (ASR) configuration
+asr:
+  engine: "faster-whisper" # "whisper", "faster-whisper"
+  model_size: "tiny"
+  language: "en"
+  translate: false
+  transformers: false
+  transformers_engine: "huggingface" # "huggingface" or "onnxruntime"
+  device: "cpu"  # Pi5 : CPU (or "hailo")
+  compute_type: "int8"
+  skip_native_teardown: true  # Avoid native teardown segfaults on some ARM/PortAudio stacks
+  # download_root: null  # Let Python code build the path dynamically
+
+wake:
+  wake_word: "hey_jarvis"
+  model_name: "hey_jarvis_v0.1"
+  inference_framework: "onnx"
+  threshold: 0.5
+  cooldown_seconds: 2.0
+  noise_suppression: true
+
+audio:
+  input_sample_rate: 44100
+  input_chunk_ms: 30  # taille des chunks audio en ms
+  input_chunk_size: 300
+  input_device_index: 2 # No input-capable PyAudio device detected on this machine; use system default when a mic is attached
+  volume: 0.8  # half as loud
+  output_device_index: 0 # PyAudio output device: USB PnP Audio Device: Audio (hw:3,0)
+  output_sample_rate: 44100
+  output_chunk_ms: 30  # taille des chunks audio en ms
+  output_chunk_size: 500

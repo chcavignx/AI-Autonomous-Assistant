@@ -1,33 +1,36 @@
 # !/usr/bin/env python3
-"""Script to move data from data/models/piper to cache/models/piper"""
+"""Script to move data from data/models/piper to cache/models/piper."""
 
 import os
+import pathlib
+import sys
 
-from utils.config import load_config, setup_python_path
+# Add project root to sys.path
+root_path = pathlib.Path(__file__).resolve().parents[3]
+if str(root_path) not in sys.path:
+    sys.path.insert(0, str(root_path))
 
-setup_python_path()
-config = load_config()
+from src.utils.config import config
 
-PIPER_DIR = "models/piper"
+LOCAL_PIPER_DIR = "models/piper"
+DEST_PIPER_DIR = "piper"
 
 
 def run() -> None:
-    """Function to move data from data/models/piper to cache/models/piper"""
-    cache_dir = config.paths.cache_path
-    data_dir = config.paths.data_path
-    piper_dir = data_dir / PIPER_DIR
-    cache_piper_dir = cache_dir / PIPER_DIR
-    os.makedirs(cache_piper_dir, exist_ok=True)
+    """Function to move data from data/models/piper to cache/audio/models/piper."""
+    piper_dir = pathlib.Path(os.path.join(config.paths.data_path, LOCAL_PIPER_DIR))
+    cache_piper_dir = pathlib.Path(
+        os.path.join(config.paths.models_audio_path, DEST_PIPER_DIR)
+    )
+    pathlib.Path(cache_piper_dir).mkdir(exist_ok=True, parents=True)
 
     for model in os.listdir(piper_dir):
-        model_path = piper_dir / model
-        cache_model_path = cache_piper_dir / model
-        if os.path.exists(cache_model_path):
-            print(f"Model {model} already exists in {cache_piper_dir}. Skipping.")
+        model_path = pathlib.Path(os.path.join(piper_dir, str(model)))
+        cache_model_path = pathlib.Path(os.path.join(cache_piper_dir, str(model)))
+        if pathlib.Path(cache_model_path).exists():
             continue
-        print(f"Moving {model} to {cache_piper_dir}")
-        os.rename(model_path, cache_model_path)
-    print(f"All models have been moved to {cache_piper_dir}")
+        # os.rename(model_path, cache_model_path)
+        os.symlink(model_path, cache_model_path)
 
 
 if __name__ == "__main__":

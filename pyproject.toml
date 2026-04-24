@@ -41,6 +41,7 @@ classifiers = [
 # Dépendances principales (runtime)
 dependencies = [
     "blobfile",
+    "dotenv>=0.9.9",
     "flask-cors>=4.0.0",
     "flask>=2.3.0",
     "joblib>=1.3.0",
@@ -48,101 +49,147 @@ dependencies = [
     "loguru>=0.7.0",
     "numba>=0.57.0",
     "numpy>=1.24.0",
+    "onnxruntime>=1.16.0",
+    "psutil>=7.2.2",
     "pydantic>=2.0.0",
     "python-dotenv",
     "pyyaml>=6.0",
     "requests>=2.31.0",
-    "types-requests",
     "typing-extensions>=4.12",
-]
-
-# Dépendances optionnelles pour CI/CD
-[project.optional-dependencies]
-ai = [
     "accelerate>=0.20.3",
     "datasets>=2.14.5",
-    "huggingface-hub>=0.18.0",
-    "tiktoken>=0.4.0",
-    "tokenizers>=0.19.0",
-    "transformers>=4.35.0",
-]
-vision = [
-    "pillow>=10.0.0",
-    "torch>=2.0.2",
-    "torchvision>=0.15.2",
-]
-audio = [
     "faster-whisper>=0.1.3",
+    "huggingface-hub>=0.18.0",
     "openai-whisper>=20230314",
-    "piper-tts>=0.1.0",
     "pydub>=0.25.1",
     "pyttsx3>=2.90",
     "scipy>=1.11.0",
     "silero-vad>=2.0.0",
-    "sounddevice>=0.4.6",
     "soundfile>=0.12.1",
-    "speechrecognition>=3.10.0",
-    "torchaudio>=2.0.2",
-    "vosk>=0.3.45",
-]
-dev = [
-    "basedpyright>=1.31.7",
-    "gitingest",
-    "mypy>=1.5.0",
-    "poethepoet",
-    "pre-commit",
-    "pytest>=7.4.0",
-    "pytest-cov>=4.1.0",
-    "pytest-xdist>=3.0.0",
-    "radon",
-    "ruff",
-    "skylos",
-]
-rpi = [
+    "tiktoken>=0.4.0",
+    "tokenizers>=0.19.0",
+    "transformers>=4.35.0",
+    "torch==2.9.1",
+    "torchaudio==2.9.1",
+    "lazy-loader>=0.2.0",
+    "piper-tts>=1.4.1",
     "pyaudio>=0.2.14",
+    "openwakeword>=0.1.0",
+    "sounddevice>=0.5.5",
+    "openai-whisper",
+    "faster-whisper",
 ]
-all = [
-    "ai-autonomous-assistant[audio,ai,vision,dev,rpi]",
+
+[project.optional-dependencies]
+raspberry-pi = [
+    "rpi-ws281x>=0.1.0",
+]
+
+[tool.uv.sources]
+openai-whisper = { git = "https://github.com/openai/whisper.git" }
+faster-whisper = { git = "https://github.com/SYSTRAN/faster-whisper.git" }
+ai-autonomous-assistant = { workspace = true }
+
+[tool.uv.workspace]
+members = [
+    ".",
+    ".",
+    ".",
 ]
 
 [tool.uv]
-# Configuration spécifique à uv
-# uv will use the python_version from [project] requires-python
+default-groups = ["dev"]
+link-mode = "copy"
 override-dependencies = [
     "numpy>=1.26.0,<2.0"
 ]
-# Support multiple platforms: macOS (dev), Linux x86_64 (CI), Linux ARM64 (CI/RPI)
 environments = [
-    "sys_platform == 'darwin' and platform_machine == 'arm64'",  # macOS (local development)
-    "sys_platform == 'linux' and platform_machine == 'aarch64'"  # ARM64 (RPI/CI)
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
 ]
 
-[tool.mypy]
-python_version = "3.11"
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = false
-ignore_missing_imports = true
-check_untyped_defs = true
-namespace_packages = true
-explicit_package_bases = true
+[dependency-groups]
+dev = [
+    { include-group = "lint" },
+    { include-group = "test" },
+    "ai-autonomous-assistant[dev]",
+    "pre-commit>=4.5.1",
+    "pre-commit-hooks>=4.0.1",
+    "prek>=0.3.8",
+]
+lint = [
+    "ruff>=0.15.8",
+    "types-requests>=2.32.4.20250913",
+    "basedpyright>=0.1.0",
+]
+test = [
+    "pytest>=9.0.2",
+    "pytest-cov>=4.1.0",
+    "pytest-xdist>=3.0.0",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+output-format = "full"
+src = ["src", "tests", "examples"]
+extend-exclude = [
+    "examples/",
+    "scripts/",
+    "src/ai_autonomous_assistant.egg-info/",
+    "src/audio/",
+    "src/vision/",
+]
+
+[tool.ruff.lint]
+select = ["ALL"]
+preview = true
+ignore = [
+    "CPY001",  # copyright notice (really?)
+    "D203",    # blank line before class docstring (conflicts D211)
+    "D213",    # multiline docstring second line (conflicts D212)
+    "COM812",  # trailing comma - conflicts with ruff format
+    "ISC001",  # implicit string concat - conflicts with ruff format
+    "TD003",   # missing link in TODO
+    "FIX002",  # line contains TODO (I have TODOs and I'm not apologizing)
+    "D100", "D101", "D102", "D103", "D104", "DOC201" # docstrings - I don't care about docstrings, Ruff. Relax.
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",    # assert is fine in tests, Ruff. Relax.
+    "PLR2004", # magic values in tests are normal
+    "ANN",     # type annotations can be loose in tests
+    "D100", "D101", "D102", "D103", "D104",  # docstrings in tests? come on
+    "ARG001", "ARG002", "ARG005",  # unused args - hello, pytest fixtures and mocks
+    "SLF001",  # accessing private attrs in tests is fine
+    "TRY003", "EM101",   # exception messages in tests don't matter
+    "ERA001",  # test method names can be less strict
+    "N802",    # function naming - mock functions need specific names
+    "PLR6301", # methods that could be static - mock classes often don't need it
+    "PLC0415", # imports at function level - sometimes necessary for mocking
+    "TRY300",  # try-else suggestions - tests often have try-except patterns
+    "S404",    # subprocess import flagged as insecure - needed for testing
+    "BLE001",  # blind exception catches - intentional in error handling tests
+]
+
+[tool.ruff.format]
+docstring-code-format = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py", "__test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+
 addopts = [
     "--strict-markers",
     "--strict-config",
     "-W error",  # STRICT: Treat warnings as errors (catch deprecations early)
+    "-ra",
     "--tb=short",
     "--cov=.",
     "--cov-report=term-missing:skip-covered",
-    "--cov-report=html",
     "--cov-report=xml",
     "--cov-fail-under=80",  # STRICT: Require 80% coverage
 ]
@@ -167,7 +214,6 @@ norecursedirs = [
 "**/.mypy_cache/",
 "**/.ruff_cache/",
 "**/examples/",
-"**/test*",
 "**/node_modules",
 ".git",
 ".pyright_cache",
@@ -178,3 +224,123 @@ norecursedirs = [
 "outputs",
 "*.egg-info",
 ]
+
+
+[tool.basedpyright]
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+
+typeCheckingMode = "strict"  # or "standard"/"recommended"
+useLibraryCodeForTypes = true
+reportMissingTypeStubs = false
+enableTypeIgnoreComments = false
+extraPaths = ["."]
+# baseline settings
+baselineFile = ".tmp/basedpyright-baseline.json"
+
+include = ["src", "examples"]
+exclude = [
+    "scripts/",
+    "src/ai_autonomous_assistant.egg-info/",
+    ".venv",
+    "venv",
+    "env",
+    ".env",
+    ".pytest_cache",
+    ".git",
+    ".ruff_cache",
+    ".tmp",
+    "**/__pycache__",
+    "**/node_modules",
+    "logs",
+    "output",
+    "data",
+    "build",
+    "dist",
+    "*.egg-info",
+    "*.egg",
+    "src/vision/",
+]
+
+# ============================================================
+# STRICT NULL SAFETY (like TS strictNullChecks)
+# ============================================================
+reportOptionalSubscript = true
+reportOptionalMemberAccess = true
+reportOptionalCall = true
+reportOptionalIterable = true
+reportOptionalContextManager = true
+reportOptionalOperand = true
+reportAny = true
+reportExplicitAny = true
+reportIgnoreCommentWithoutRule = false
+reportPrivateLocalImportUsage = true
+
+# ============================================================
+# TYPE COMPLETENESS (like TS noImplicitAny + strictFunctionTypes)
+# ============================================================
+reportMissingParameterType = true
+reportMissingTypeArgument = true
+reportUnknownParameterType = true
+reportUnknownLambdaType = true
+reportUnknownArgumentType = true   # STRICT: Enable (can be noisy)
+reportUnknownVariableType = true   # STRICT: Enable (can be noisy)
+reportUnknownMemberType = true     # STRICT: Enable (can be noisy)
+reportUntypedFunctionDecorator = true
+reportUntypedClassDecorator = true
+reportUntypedBaseClass = true
+reportUntypedNamedTuple = true
+
+# ============================================================
+# CLASS AND INHERITANCE CHECKS
+# ============================================================
+reportIncompatibleMethodOverride = true
+reportIncompatibleVariableOverride = true
+reportInconsistentConstructor = true
+reportUninitializedInstanceVariable = true
+reportOverlappingOverload = true
+reportMissingSuperCall = true  # STRICT: Enable
+
+# ============================================================
+# CODE QUALITY (like TS noUnusedLocals + noUnusedParameters)
+# ============================================================
+reportPrivateUsage = true
+reportConstantRedefinition = true
+reportInvalidStubStatement = true
+reportIncompleteStub = true
+reportUnsupportedDunderAll = true
+reportUnusedClass = "error"        # STRICT: Error instead of warning
+reportUnusedFunction = "error"     # STRICT: Error instead of warning
+reportUnusedVariable = "error"     # STRICT: Error instead of warning
+reportUnusedImport = "error"       # STRICT: Error instead of warning
+reportDuplicateImport = "error"    # STRICT: Error instead of warning
+
+# ============================================================
+# UNNECESSARY CODE DETECTION
+# ============================================================
+reportUnnecessaryIsInstance = "error"         # STRICT: Error
+reportUnnecessaryCast = "error"               # STRICT: Error
+reportUnnecessaryComparison = "error"         # STRICT: Error
+reportUnnecessaryContains = "error"           # STRICT: Error
+reportUnnecessaryTypeIgnoreComment = "error"  # STRICT: Error
+
+# ============================================================
+# FUNCTION/METHOD SIGNATURE STRICTNESS
+# ============================================================
+reportGeneralTypeIssues = true
+reportPropertyTypeMismatch = true
+reportFunctionMemberAccess = true
+reportCallInDefaultInitializer = true
+reportImplicitStringConcatenation = true  # STRICT: Enable
+
+# ============================================================
+# ADDITIONAL STRICT CHECKS (Progressive Enhancement)
+# ============================================================
+reportImplicitOverride = true    # STRICT: Require @override decorator (Python 3.12+)
+reportDeprecated = "warning"     # Warn on deprecated usage
+
+# ============================================================
+# ADDITIONAL TYPE CHECKS
+# ============================================================
+reportImportCycles = "warning"

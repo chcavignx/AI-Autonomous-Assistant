@@ -1,12 +1,20 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.5
+    rev: v0.15.8
     hooks:
-      - id: ruff-check
+      - id: ruff
+        name: ruff check --fix (commit)
+        stages: [pre-commit]
         args: [--fix]
         description: "Run 'ruff check' for extremely fast Python linting"
       - id: ruff-format
+        name: ruff-format (commit)
+        stages: [pre-commit]
         description: "Run 'ruff format' for extremely fast Python formatting"
+      - id: ruff
+        name: ruff check (push)
+        stages: [pre-push]
+        description: "Run 'ruff check' for extremely fast Python linting"
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
@@ -30,3 +38,12 @@ repos:
       - id: conventional-pre-commit
         stages: [commit-msg]
         description: "Run 'conventional-pre-commit' for conventional commit messages"
+  - repo: local
+    hooks:
+      - id: basedpyright
+        name: basedpyright strict type-check (push)
+        entry: uv run basedpyright --level error
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-push]
