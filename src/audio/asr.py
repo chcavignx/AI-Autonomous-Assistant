@@ -206,6 +206,8 @@ class ASREngine:
     def _load_whisper(self) -> None:
         """Load openai-whisper."""
         try:
+            import whisper
+
             logger.info("Loading Whisper %s...", self._config.asr.model_size)
             self._stt_model = cast(
                 _WhisperModelLike,
@@ -223,6 +225,7 @@ class ASREngine:
     def _load_faster_whisper(self) -> None:
         """Load faster-whisper (recommended for Pi5)."""
         try:
+            import faster_whisper
             logger.info("Loading Faster-Whisper %s...", self._config.asr.model_size)
             self._stt_model = cast(
                 _FasterWhisperModelLike,
@@ -316,13 +319,8 @@ class ASREngine:
                 with contextlib.suppress(Exception):
                     self._stream.stop_stream()
 
-            # if self._capture_thread and self._capture_thread is not current_thread:
-            #     self._capture_thread.join(timeout=5.0)
-            #     if self._capture_thread.is_alive() and self._stream:
-            #         logger.warning("ASR capture thread did not exit after stop_stream(); aborting stream")
-            #         with contextlib.suppress(Exception):
-            #             self._stream.abort_stream()
-            #         self._capture_thread.join(timeout=2.0)
+            if self._capture_thread and self._capture_thread is not current_thread:
+                self._capture_thread.join(timeout=5.0)
 
             if self._stream and (
                 not self._capture_thread or not self._capture_thread.is_alive()
@@ -652,8 +650,6 @@ class ASREngine:
                 segments_source = cast(_WhisperResultLike, result).segments
             elif isinstance(result, list):
                 segments_source = cast(list[object], result)
-            elif isinstance(result, tuple):
-                segments_source = cast(tuple[object, ...], result)
             else:
                 segments_source = [result]
 
@@ -709,7 +705,7 @@ class ASREngine:
             msg = "ASREngine not loaded"
             raise RuntimeError(msg)
 
-        if self._config.asr.engine == "faster_whisper":
+        if self._config.asr.engine.lower() in {"faster-whisper", "faster_whisper"}:
             model = cast(_FasterWhisperModelLike, self._stt_model)
             segments, _info = model.transcribe(
                 audio_path,

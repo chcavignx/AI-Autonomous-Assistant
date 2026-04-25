@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import pathlib
 import sys
 import wave
 
@@ -11,12 +12,10 @@ from src.utils.config import config
 SetLogLevel(0)
 # Check if the audio file is provided as a command line argument
 if len(sys.argv) != 2:
-    print("Usage: python vosk_test_simple.py <audio_file.wav>")
     sys.exit(1)
 # Open the audio file
 wf = wave.open(sys.argv[1], "rb")
 if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getcomptype() != "NONE":
-    print("Audio file must be WAV format mono PCM.")
     sys.exit(1)
 # Initialize the Vosk model
 # You can initialize the model with a specific language or use the default model
@@ -36,20 +35,15 @@ MODEL_NAME = "vosk-model-small-en-us-0.15"
 # If you have already downloaded the model, you can load it like this:
 MODEL_DIR = str(config.paths.models_path / "vosk")
 LOCAL_DIR = os.path.join(MODEL_DIR, MODEL_NAME)
-if not os.path.exists(LOCAL_DIR):
-    print(
-        f"Model {MODEL_NAME} not found. Please download it from https://alphacephei.com/vosk/models"
-    )
+if not pathlib.Path(LOCAL_DIR).exists():
     sys.exit(1)
 # Load the model from the local directory
-print(f"Loading model from {MODEL_NAME}")
 model = Model(model_name=MODEL_NAME, model_path=MODEL_DIR)
 # Initialize the Kaldi recognizer with the model and sample rate
 rec = KaldiRecognizer(model, wf.getframerate())
 rec.SetWords(True)
 rec.SetPartialWords(True)
 # Read the audio file in chunks and process it
-print("Starting transcription...")
 # You can also use rec.AcceptWaveform(data) to process the audio in chunks
 # or rec.PartialResult() to get partial results
 # or rec.Result() to get final results
@@ -59,8 +53,7 @@ while True:
     if len(data) == 0:
         break
     if rec.AcceptWaveform(data):
-        print(rec.Result())
+        pass
     else:
-        print(rec.PartialResult())
+        pass
 # Print the final result
-print(rec.FinalResult())

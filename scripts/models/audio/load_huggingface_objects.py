@@ -23,7 +23,10 @@ load_dotenv()  # par défaut, cherche un fichier .env dans le répertoire couran
 # Configuration with defaults and .env overrides
 HF_TOKEN = os.getenv("HF_TOKEN")
 
-login(token=HF_TOKEN)
+if HF_TOKEN:
+    login(token=HF_TOKEN)
+else:
+    print("Warning: HF_TOKEN not set. Some gated models may not be accessible.")
 
 from src.utils.config import config
 

@@ -1,159 +1,107 @@
-# Tutorial: Testing a USB Microphone and a USB Sound Card on Raspberry Pi 5
+# Tutorial: Testing a USB Microphone and a USB Speaker on Raspberry Pi 5
 
-This complete, step-by-step guide will help you connect, configure, and test a USB microphone and a USB sound card on a Raspberry Pi 5. It covers the key aspects you need to get your audio hardware working.
+This guide helps you verify the basic audio path used by the repository audio stack:
 
-## Key Points of the Tutorial
+- USB microphone capture
+- Speaker playback
+- ALSA and PyAudio device visibility
+- Optional device pinning in `config.yaml`
 
-### Hardware Setup
+The audio engines in `src/audio` can resample device audio in software when the hardware sample rate does not match the configured model rate, so exact hardware matching is helpful but not mandatory.
 
-- **Raspberry Pi 5 specifics:** There is no built-in audio jack on the Raspberry Pi 5.
-- **Connect USB audio devices:** Plug in your USB microphone and/or USB sound card.
-- **Verify device detection:** Use commands to confirm devices are recognized.
+## Hardware Setup
 
-### Testing and Configuration
+- Raspberry Pi 5 has no built-in analog audio jack
+- Connect your USB microphone and/or USB speaker or sound card
+- Confirm that the devices appear in ALSA and, if applicable, in PipeWire
 
-- **Use `arecord` and `aplay` for audio tests:**
-  - `arecord` is used to record audio from your microphone.
-  - `aplay` is used to play back audio.
+## Useful Commands
 
-- **Adjust levels with `alsamixer`:** Launch `alsamixer` in the terminal to set microphone and output levels.
+- `lsusb` to list USB devices
+- `aplay -l` and `aplay -L` to list playback devices
+- `arecord -l` and `arecord -L` to list capture devices
+- `speaker-test` to test output
+- `arecord` to test microphone input
+- `aplay` to play a recorded file
+- `alsamixer` to adjust input and output levels
 
-- **Audio quality testing:** Test with different audio formats for best performance.
+## Step By Step
 
-### Advanced Technical Aspects
+1. Plug in the USB microphone and speaker.
+2. Confirm the devices are visible.
 
-- **ALSA vs PipeWire:** Be aware that on Raspberry Pi OS Bookworm, PipeWire may replace or supplement ALSA. Configuration steps may differ.
-- **Automation scripts:** You can create scripts to automate audio device tests.
-- **Troubleshooting:** Includes common problems and their fixes.
+   ```bash
+   lsusb
+   aplay -l
+   arecord -l
+   ```
 
-### Essential Commands
+3. Install the ALSA tools if needed.
 
-- `lsusb` — List all connected USB devices.
-- `aplay -l` and `arecord -l` — List audio playback and capture devices.
-- `speaker-test` — Test speaker output.
-- `arecord` — Test microphone input.
-- `aplay` — Playback recorded audio.
-- `alsamixer` — Adjust playback and recording levels.
+   ```bash
+   sudo apt update
+   sudo apt install -y alsa-utils
+   ```
 
-## Step-by-Step Instructions
+4. Test speaker output.
 
-1. **Connect your USB mic and/or USB sound card to the Pi.**
-2. **Check device recognition:**
+   ```bash
+   speaker-test -c2 -t wav
+   ```
 
-    ```bash
-    lsusb
-    aplay -l -L
-    arecord -l -L
-    ```
+5. Test microphone input.
 
-    output example for arecord -l -L command
+   ```bash
+   arecord -f cd -d 5 test.wav
+   ```
 
-    ```text
-    null
-    Discard all samples (playback) or generate zero samples (capture)
-    sysdefault
-    Default Audio Device
-    default
-    mic
-    hw:CARD=Device,DEV=0
-        USB ENC Audio Device, USB Audio
-        Direct hardware device without any conversions
-    plughw:CARD=Device,DEV=0
-        USB ENC Audio Device, USB Audio
-        Hardware device with all software conversions
-    sysdefault:CARD=Device
-        USB ENC Audio Device, USB Audio
-        Default Audio Device
-    front:CARD=Device,DEV=0
-        USB ENC Audio Device, USB Audio
-        Front output / input
-    dsnoop:CARD=Device,DEV=0
-        USB ENC Audio Device, USB Audio
-        Direct sample snooping device
-    **** List of CAPTURE Hardware Devices ****
-    card 0: Device [USB ENC Audio Device], device 0: USB Audio [USB Audio]
-    Subdevices: 1/1
-    Subdevice #0: subdevice #0
-    ```
+6. Play the recording back.
 
-3. **Install ALSA utilities (if not already present):**
+   ```bash
+   aplay test.wav
+   ```
 
-    ```bash
-    sudo apt update
-    sudo apt install alsa-utils
-    ```
+7. Adjust levels if necessary.
 
-4. **Test audio output:**
+   ```bash
+   alsamixer
+   ```
 
-    ```bash
-    speaker-test -D plughw:1,0 -c2 -t wav
-    ```
+   - Press `F6` to select the card
+   - Raise or lower capture and playback levels as needed
 
-5. **Test microphone input:**
+## Device Selection In The Project
 
-    ```bash
-    arecord -D plughw:0,0 -f cd test.wav
-    ```
+The current audio config supports explicit device indices:
 
-    (Replace `0,0` with your device's card and device number from `arecord -l`)
-6. **Playback your recording:**
+- `audio.input_device_index`
+- `audio.output_device_index`
 
-    ```bash
-    aplay -D plughw:1,0 test.wav
-    ```
+If you need to pin a device, identify the correct ALSA card first and then set the matching index in `config.yaml`.
 
-7. **Set levels with alsamixer:**
+## Optional ALSA Default Routing
 
-    ```bash
-    alsamixer
-    ```
+If you want to set a default ALSA route for testing, you can create `~/.asoundrc` with a simple playback and capture mapping. Adjust the `plughw` entries to match your hardware.
 
-    - Press F6 to select your card.
-    - Adjust levels as needed.
-
-8. **Configuration File:**
-
-    To explicitly set a default audio device for ALSA, create or edit the `.asoundrc` file in your home directory.
-
-    1. **Open a terminal on your Raspberry Pi.**
-    2. **Create or edit `.asoundrc`:** Use a text editor (e.g., `vim`, `nano`) to open `~/.asoundrc`.
-    3. **Add the following configuration:** This example sets `hw:1,0` as the default playback device. Adjust the card and device numbers as needed for your hardware.
-
-    ```bash
-    pcm.!default {
-    type asym
-    playback.pcm "plughw:1,0"
-    capture.pcm "plughw:0,0"
-    }
-    ```
-
-    Make sure that  "plughw:1,0"  (or whatever numbers match your device) refers to a valid playback-capable device, and  "plughw:0,0"  to a valid capture-capable device.
-
-    4. **Reboot:** Reboot your Raspberry Pi to ensure the new configuration is loaded correctly.
-
-    ```Bash
-    sudo reboot
-    ```
+```bash
+pcm.!default {
+type asym
+playback.pcm "plughw:1,0"
+capture.pcm "plughw:0,0"
+}
+```
 
 ## Troubleshooting
 
-- **No audio devices found:** Make sure your devices are fully compatible and recognized (`lsusb`, `aplay -l`, `arecord -l`).
-- **Permission issues:** Run commands with `sudo` if necessary.
-- **Distorted audio:** Check levels in `alsamixer` and try different USB ports.
+- No device listed: reconnect the USB hardware and check `lsusb`
+- No capture in `arecord`: verify the mic is selected as the input device
+- Low volume or clipping: adjust levels in `alsamixer`
+- Wrong device chosen by default: set `audio.input_device_index` and `audio.output_device_index`
 
-## Automation Example
+## Automation Script
 
-Create and run a simple test script (save as [audio_test.sh](scripts/audio_test.sh)):
+The repository includes a small shell script for a basic record-and-playback check:
 
-```bash
-#!/bin/bash
-arecord -f cd -d 5 test.wav
-aplay test.wav
-```
+- `scripts/tests/audio_test.sh`
 
-Give it executable permissions:
-
-```bash
-chmod +x audio_test.sh
-./audio_test.sh
-```
+It records five seconds of audio and plays it back locally.

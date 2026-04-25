@@ -149,6 +149,9 @@ class TTSEngine(object):
         self._tts_queue.put(None)  # sentinel
         if self._playback_thread:
             self._playback_thread.join(timeout=3.0)
+            if self._playback_thread.is_alive():
+                logger.warning("TTS playback thread did not terminate in time")
+                return  # Don't terminate PyAudio while thread may still use it
         if self._pa:
             with suppress_pa_stderr():
                 self._pa.terminate()
@@ -302,9 +305,7 @@ class TTSEngine(object):
                 return None
 
             # Piper --output_raw → PCM s16le 22050Hz mono
-            return self._pcm_to_wav(
-                result.stdout, sample_rate=self._config.audio.output_sample_rate
-            )
+            return self._pcm_to_wav(result.stdout, sample_rate=22050)
 
         except subprocess.TimeoutExpired:
             logger.exception("Piper synthesis timeout")

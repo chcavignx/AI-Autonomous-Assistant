@@ -18,35 +18,22 @@ env:
 jobs:
   ruff:
     name: Ruff
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install dependencies
         uses: ./.github/actions/python-uv-setup
+        with:
+          sync-flags: "--locked --no-default-groups --group lint"
       - name: Run Ruff linter
         run: uv run ruff check .
       - name: Run Ruff formatter
         run: uv run ruff format --check .
 
-  mypy:
-    name: Mypy
-    runs-on: ubuntu-24.04-arm
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Install dependencies
-        uses: ./.github/actions/python-uv-setup
-      # Restore mypy cache to speed up the run
-      - name: Restore mypy cache
-        uses: actions/cache/restore@v4
-        with:
-          path: .mypy_cache
-          key: mypy-cache-${{ hashFiles('pyproject.toml') }}
-
   test:
     name: Test "${{ inputs.marker }}"
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     # env:
     #   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     #   GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
@@ -60,7 +47,38 @@ jobs:
         run: uname -m
       - name: Install dependencies
         uses: ./.github/actions/python-uv-setup
-      - name: Sync for update
-        run: uv sync --extra all
+        with:
+          sync-flags: "--locked --no-default-groups --group test"
       - name: Run core tests
-        run: uv run pytest -n auto -m "${{ inputs.marker }}" tests/
+        run: uv run pytest -n auto -m "${{ inputs.marker }}" --cov=src --cov-report=xml tests/
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  test-raspberry-pi:
+    name: Test Raspberry Pi profile
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Check architecture
+        run: uname -m
+      - name: Install dependencies
+        uses: ./.github/actions/python-uv-setup
+        with:
+          install-system-packages: "true"
+          sync-flags: "--locked --no-default-groups --group test --extra raspberry-pi"
+      - name: Run Raspberry Pi profile tests
+        run: uv run pytest -n auto -m "${{ inputs.marker }}" --cov=src --cov-report=xml tests/
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: unittests-raspberry-pi
+          name: codecov-umbrella
+          fail_ci_if_error: false

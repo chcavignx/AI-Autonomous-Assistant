@@ -35,6 +35,8 @@ WHISPER_MODEL_SIZES = [
     "large-v2",
     "large-v3",
 ]
+ENGLISH_ONLY_COMPATIBLE = ["tiny", "base", "small", "medium"]
+
 
 from utils.sysutils import detect_raspberry_pi_model, limit_cpu_for_multiprocessing
 
@@ -115,7 +117,7 @@ class VADEngine:
     def _suffix_model_size(self, attr: str) -> None:
         """Append '.en' suffix when language is English, if not already present."""
         value = cast(str, getattr(self.config, attr))
-        if value in WHISPER_MODEL_SIZES:
+        if value in ENGLISH_ONLY_COMPATIBLE and not value.endswith(".en"):
             suffix = ".en" if self.config.stt_language == "en" else ""
             setattr(self.config, attr, f"{value}{suffix}")
 
@@ -133,6 +135,7 @@ class VADEngine:
                 audio_tensor,
                 self.model,
                 min_speech_duration_ms=self.config.min_speech_duration_ms,
+                sampling_rate=self.config.sample_rate,
             )
             return bool(timestamps)
         except (RuntimeError, ValueError):
@@ -151,6 +154,7 @@ class VADEngine:
                     self.model,
                     min_speech_duration_ms=self.config.min_speech_duration_ms,
                     min_silence_duration_ms=self.config.min_silence_duration_ms,
+                    sampling_rate=self.config.sample_rate,
                     return_seconds=True,
                 ),
             )

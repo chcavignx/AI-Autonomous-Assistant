@@ -76,8 +76,6 @@ dependencies = [
     "pyaudio>=0.2.14",
     "openwakeword>=0.1.0",
     "sounddevice>=0.5.5",
-    "openai-whisper",
-    "faster-whisper",
 ]
 
 [project.optional-dependencies]
@@ -92,8 +90,6 @@ ai-autonomous-assistant = { workspace = true }
 
 [tool.uv.workspace]
 members = [
-    ".",
-    ".",
     ".",
 ]
 
@@ -112,12 +108,12 @@ environments = [
 dev = [
     { include-group = "lint" },
     { include-group = "test" },
-    "ai-autonomous-assistant[dev]",
     "pre-commit>=4.5.1",
     "pre-commit-hooks>=4.0.1",
     "prek>=0.3.8",
 ]
 lint = [
+    "flake8>=6.0.0",
     "ruff>=0.15.8",
     "types-requests>=2.32.4.20250913",
     "basedpyright>=0.1.0",
@@ -225,13 +221,9 @@ norecursedirs = [
 "*.egg-info",
 ]
 
-
 [tool.basedpyright]
-pythonVersion = "3.12"
+pythonVersion = "3.10"
 venvPath = "."
-venv = ".venv"
-
-typeCheckingMode = "strict"  # or "standard"/"recommended"
 useLibraryCodeForTypes = true
 reportMissingTypeStubs = false
 enableTypeIgnoreComments = false

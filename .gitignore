@@ -3,7 +3,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
 build/
 develop-eggs/
 dist/
@@ -23,8 +22,7 @@ wheels/
 # Virtual environments
 venv/
 env/
-ENV/
-.venv
+.venv/
 
 # IDE
 .vscode/
@@ -50,6 +48,7 @@ node_modules/
 
 # Dataset
 cache/
+.cache/
 
 # Temporary files
 *.tmp
