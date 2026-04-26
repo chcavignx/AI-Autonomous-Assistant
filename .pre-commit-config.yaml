@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.8
+    rev: v0.15.12
     hooks:
       - id: ruff
         name: ruff check --fix (commit)
@@ -16,7 +16,7 @@ repos:
         stages: [pre-push]
         description: "Run 'ruff check' for extremely fast Python linting"
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
         description: "Run 'trailing-whitespace' for removing trailing whitespace"
@@ -33,7 +33,7 @@ repos:
       - id: check-added-large-files
         description: "Run 'check-added-large-files' for checking added large files"
   - repo: https://github.com/compilerla/conventional-pre-commit
-    rev: v2.3.0
+    rev: v4.4.0
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]
