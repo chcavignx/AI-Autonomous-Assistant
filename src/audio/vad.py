@@ -17,6 +17,8 @@ from __future__ import annotations
 import pathlib
 import sys
 from importlib import import_module
+from torch._tensor import Tensor
+from torch._tensor import Tensor
 from typing import TYPE_CHECKING, Protocol, cast
 
 import numpy as np
@@ -130,12 +132,11 @@ class VADEngine:
         if len(audio_data) < self.config.sample_rate // 4:  # need ≥ 250ms
             return False
         try:
-            audio_tensor = torch.as_tensor(audio_data, dtype=torch.float32)
-            timestamps = get_speech_timestamps(
-                audio_tensor,
-                self.model,
+            audio_tensor: Tensor = torch.as_tensor(data=audio_data, dtype=torch.float32)
+            timestamps: list[object] = get_speech_timestamps(
+                audio=audio_tensor,
+                model=self.model,
                 min_speech_duration_ms=self.config.min_speech_duration_ms,
-                sampling_rate=self.config.sample_rate,
             )
             return bool(timestamps)
         except (RuntimeError, ValueError):
@@ -146,15 +147,14 @@ class VADEngine:
     ) -> list[dict[str, object]]:
         """Return detailed speech segments with timestamps (in seconds)."""
         try:
-            audio_tensor = torch.as_tensor(audio_data, dtype=torch.float32)
+            audio_tensor: Tensor = torch.as_tensor(data=audio_data, dtype=torch.float32)
             return cast(
                 list[dict[str, object]],
                 get_speech_timestamps(
-                    audio_tensor,
-                    self.model,
+                    audio=audio_tensor,
+                    model=self.model,
                     min_speech_duration_ms=self.config.min_speech_duration_ms,
                     min_silence_duration_ms=self.config.min_silence_duration_ms,
-                    sampling_rate=self.config.sample_rate,
                     return_seconds=True,
                 ),
             )

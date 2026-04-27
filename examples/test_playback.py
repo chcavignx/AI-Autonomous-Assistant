@@ -23,11 +23,11 @@ def find_first_output_device():
     """Get first available output device index."""
     pa = pyaudio.PyAudio()
     try:
-    for idx in range(pa.get_device_count()):
-        info = pa.get_device_info_by_index(idx)
-        max_output = info.get("maxOutputChannels", 0)
-        if max_output and max_output > 0:
-            return idx
+        for idx in range(pa.get_device_count()):
+            info = pa.get_device_info_by_index(idx)
+            max_output = info.get("maxOutputChannels", 0)
+            if max_output and max_output > 0:
+               return idx
     finally:
         pa.terminate()
     return None
