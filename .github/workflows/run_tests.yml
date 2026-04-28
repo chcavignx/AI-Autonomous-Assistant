@@ -12,8 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # If set, uv will run without updating the uv.lock file. Equivalent to the `uv run --frozen`.
-  UV_FROZEN: "1"
+  # Set the default log level for the tests
+  LOG_LEVEL: info
 
 jobs:
   ruff:

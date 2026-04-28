@@ -33,9 +33,6 @@ from typing import BinaryIO, Protocol, cast
 
 import numpy as np
 from numpy.typing import NDArray
-import faster_whisper
-import pyaudio
-import whisper
 
 
 # Ensure 'src' is in sys.path
@@ -207,40 +204,48 @@ class ASREngine:
         """Load openai-whisper."""
         try:
             import whisper
-
-            logger.info("Loading Whisper %s...", self._config.asr.model_size)
-            self._stt_model = cast(
-                _WhisperModelLike,
-                whisper.load_model(
-                    name=self._config.asr.model_size,
-                    device=self._config.asr.device,
-                    download_root=str(self._config.asr.download_path),
-                ),
-            )
-            logger.info("Whisper loaded")
         except ImportError:
-            logger.exception("openai-whisper not installed. pip install openai-whisper")
+            logger.exception("Whisper not installed. ASR using Whisper will be disabled.")
+            return
+        try:
+            if self._stt_model is None:
+                logger.info(f"Loading Whisper model {self._config.asr.model_size}...")
+                self._stt_model = cast(_WhisperModelLike,
+                        whisper.load_model(
+                                name=self._config.asr.model_size,
+                                device=self._config.asr.device,
+                                download_root=str(self._config.asr.download_path),
+                        ),
+                )
+            return
+        except Exception as e:
+            logger.exception(f"Failed to load Whisper model: {e}")
             return
 
     def _load_faster_whisper(self) -> None:
         """Load faster-whisper (recommended for Pi5)."""
         try:
             import faster_whisper
-            logger.info("Loading Faster-Whisper %s...", self._config.asr.model_size)
-            self._stt_model = cast(
-                _FasterWhisperModelLike,
-                faster_whisper.WhisperModel(
-                    model_size_or_path=self._config.asr.model_size,
-                    device=self._config.asr.device,
-                    compute_type=self._config.asr.compute_type,
-                    cpu_threads=1,
-                    num_workers=1,
-                ),
-            )
-            logger.info("Faster-Whisper loaded")
         except ImportError:
-            logger.exception("faster-whisper not installed. pip install faster-whisper")
+            logger.exception("Faster Whisper not installed. ASR using Faster Whisper will be disabled.")
             return
+        try:
+            if self._stt_model is None:
+                logger.info("Loading Faster-Whisper %s...", self._config.asr.model_size)
+                self._stt_model = cast(_FasterWhisperModelLike,
+                            faster_whisper.WhisperModel(
+                                model_size_or_path=self._config.asr.model_size,
+                                device=self._config.asr.device,
+                                compute_type=self._config.asr.compute_type,
+                                cpu_threads=1,
+                                num_workers=1,
+                            ),
+                )
+                logger.info("Faster-Whisper loaded")
+                return
+        except Exception as e:
+            logger.exception(f"Failed to load Faster-Whisper model: {e}")
+            return None
 
     @staticmethod
     def _configure_torch_runtime() -> None:

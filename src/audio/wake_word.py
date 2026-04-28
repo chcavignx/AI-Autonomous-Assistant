@@ -140,14 +140,20 @@ class WakeWordDetector:
             msg = "openwakeword not installed. pip install openwakeword"
             raise ImportError(msg)
 
-        logger.info("Loading wake word model: %s", self._config.wake.model_name)
-        logger.info(
-            "Loading wake word model path: %s", self._config.wake.full_model_path
-        )
+        model_name = self._config.wake.model_name
+        model_path = self._config.wake.full_model_path
+
+        logger.info("Loading wake word model: %s", model_name)
+        logger.info("Loading wake word model path: %s", model_path)
+
+        if not pathlib.Path(model_path).is_file():
+            logger.error("Wake word model file not found at: %s", model_path)
+            raise FileNotFoundError(f"Wake word model file not found: {model_path}")
+
         self._model = cast(
             _WakeWordModelLike,
             Model(
-                wakeword_models=[str(self._config.wake.full_model_path)],
+                wakeword_models=[str(model_path)],
                 inference_framework=self._config.wake.inference_framework or "onnx",
                 melspec_model_path=str(
                     self._config.wake.download_path / "melspectrogram.onnx"
