@@ -1,14 +1,18 @@
 name: Python + uv setup
-description: Checkout, set up uv/Python, and sync dev deps
+description: Set up uv/Python and sync the requested dependency profile
 inputs:
   python-version:
     description: Python version to install
     required: false
     default: "3.11.6"
   sync-flags:
-    description: Extra flags for uv sync (e.g., --all-extras --dev --frozen)
+    description: Extra flags for uv sync (e.g., --locked --group test)
     required: false
-    default: "--all-extras --dev"
+    default: "--locked"
+  install-system-packages:
+    description: Install Linux system packages required by audio / Raspberry Pi jobs
+    required: false
+    default: "false"
   working-directory:
     description: Directory to run in
     required: false
@@ -16,12 +20,12 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Install the latest version of uv
+    - name: Install uv
       id: setup_uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@v7
       with:
         python-version: ${{ inputs.python-version }}
-        version: "latest"
+        version: "0.11.2"
         enable-cache: true
         prune-cache: false
         cache-suffix: ${{ inputs.python-version }}
@@ -33,9 +37,9 @@ runs:
       shell: bash
       run: |
         echo "uv download cache hit: ${{ steps.setup_uv.outputs['cache-hit'] }}"
-        echo ".venv cache hit: ${{ steps.cache_venv.outputs.cache-hit }}"
 
     - name: Install system dependencies
+      if: ${{ inputs.install-system-packages == 'true' }}
       shell: bash
       run: |
         if command -v sudo &> /dev/null; then
@@ -44,7 +48,7 @@ runs:
             SUDO=""
         fi
         $SUDO apt-get update
-        $SUDO apt-get install -y ffmpeg portaudio19-dev alsa-utils espeak-ng python3-pyaudio
+        $SUDO apt-get install -y ffmpeg portaudio19-dev alsa-utils
 
     - name: Install the project dependencies
       shell: bash

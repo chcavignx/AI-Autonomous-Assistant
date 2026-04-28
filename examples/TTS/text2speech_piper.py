@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""
-Example of text to speech using Piper
-"""
+"""Example of text to speech using Piper."""
 
 import os
+import pathlib
 import wave
+from collections.abc import Iterable
+from os import PathLike
+from typing import Protocol, cast
 
+import numpy as np
+from numpy.typing import NDArray
 import sounddevice as sd
 from piper import PiperVoice, SynthesisConfig
 
@@ -26,34 +30,74 @@ syn_config = SynthesisConfig(
 )
 
 
+class _AudioChunkLike(Protocol):
+    audio_int16_array: NDArray[np.int16]
+
+
+class _PiperVoiceLike(Protocol):
+    class _ConfigLike(Protocol):
+        sample_rate: int
+
+    config: _ConfigLike
+
+    @staticmethod
+    def load(model_path: str | PathLike[str]) -> "_PiperVoiceLike": ...
+
+    def synthesize_wav(
+        self,
+        *,
+        text: str,
+        wav_file: wave.Wave_write,
+        set_wav_format: bool,
+        syn_config: SynthesisConfig,
+    ) -> object: ...
+
+    def synthesize(self, text: str) -> Iterable[_AudioChunkLike]: ...
+
+
+class _OutputStreamLike(Protocol):
+    def start(self) -> None: ...
+
+    def write(self, data: NDArray[np.int16]) -> None: ...
+
+    def stop(self) -> None: ...
+
+    def close(self) -> None: ...
+
+
 # Service to create unique filenames from base name, suffix and counter if needed
-def setup_output_filename(base_path, base_name, suffix, counter=1):
+def setup_output_filename(
+    base_path: str | PathLike[str],
+    base_name: str,
+    suffix: str,
+    counter: int = 1,
+) -> str:
     """Generates a unique filename by appending a counter if needed."""
     counter = 1
+    resolved_base_path = os.fspath(base_path)
     file_name, file_extension = os.path.splitext(base_name)
-    output_file = os.path.join(base_path, f"{file_name}_{suffix}{file_extension}")
+    output_file = os.path.join(resolved_base_path, f"{file_name}_{suffix}{file_extension}")
 
-    while os.path.exists(output_file):
-        output_file = os.path.join(
-            base_path, f"{file_name}_{suffix}_{counter}{file_extension}"
-        )
+    while pathlib.Path(output_file).exists():
+        output_file = os.path.join(resolved_base_path, f"{file_name}_{suffix}_{counter}{file_extension}")
         counter += 1
 
     return output_file
 
 
 # Function to synthesize text to speech and save as a WAV file
-def synthesize_voice_and_save(model_path, text, output_file):
+def synthesize_voice_and_save(
+    model_path: str | PathLike[str],
+    text: str,
+    output_file: str | PathLike[str],
+) -> None:
     """Synthesizes text to audio, saves it and plays."""
     # Create a Piper object
-    voice = PiperVoice.load(model_path)
+    voice = cast(_PiperVoiceLike, PiperVoice.load(os.fspath(model_path)))
 
-    with wave.open(output_file, "wb") as wav_file:
-        voice.synthesize_wav(
-            text=text, wav_file=wav_file, set_wav_format=True, syn_config=syn_config
-        )
+    with wave.open(os.fspath(output_file), "wb") as wav_file:
+        voice.synthesize_wav(text=text, wav_file=wav_file, set_wav_format=True, syn_config=syn_config)
 
-    print(f"Audio file saved to: {output_file}")
     # Lecture du fichier généré
     # data, fs = sf.read(output_file, dtype='int16')
     # sd.play(data, fs)
@@ -63,12 +107,13 @@ def synthesize_voice_and_save(model_path, text, output_file):
     # print("Synthesis complete.")
 
 
-def synthesize_voice(model_path, text):
+def synthesize_voice(model_path: str | PathLike[str], text: str) -> None:
     """Synthesizes text to audio and plays it."""
     # Create a Piper object
-    voice = PiperVoice.load(model_path)
-    stream = sd.OutputStream(
-        samplerate=voice.config.sample_rate, channels=1, dtype="int16"
+    voice = cast(_PiperVoiceLike, PiperVoice.load(os.fspath(model_path)))
+    stream = cast(
+        _OutputStreamLike,
+        sd.OutputStream(samplerate=voice.config.sample_rate, channels=1, dtype="int16"),
     )
     stream.start()
     for audio_bytes in voice.synthesize(text):
@@ -76,7 +121,6 @@ def synthesize_voice(model_path, text):
 
     stream.stop()
     stream.close()
-    print("Synthesis complete.")
 
 
 def main() -> None:
@@ -87,9 +131,7 @@ def main() -> None:
     text_fr = " Je m'appelle Gilles et je suis ravi de vous rencontrer."
     text_fr += " Je suis très heureux de pouvoir parler avec vous aujourd'hui."
     text_fr += " J'espère que vous apprécierez cette démonstration."
-    file_fr = setup_output_filename(
-        DATA_DIR, TEST_FILE_NAME, model_fr.split("/")[-1].replace(".onnx", "")
-    )
+    file_fr = setup_output_filename(DATA_DIR, TEST_FILE_NAME, model_fr.split("/")[-1].replace(".onnx", ""))
     synthesize_voice_and_save(model_fr, text_fr, file_fr)
     synthesize_voice(model_fr, text_fr)
     # Example for the English (GB) voice
@@ -98,9 +140,7 @@ def main() -> None:
     text_en = " My name is Jarvis and I am delighted to meet you."
     text_en += " I am very happy to be able to speak with you today."
     text_en += " I hope you will enjoy this demonstration."
-    file_en = setup_output_filename(
-        DATA_DIR, TEST_FILE_NAME, model_en.split("/")[-1].replace(".onnx", "")
-    )
+    file_en = setup_output_filename(DATA_DIR, TEST_FILE_NAME, model_en.split("/")[-1].replace(".onnx", ""))
     synthesize_voice_and_save(model_en, text_en, file_en)
     synthesize_voice(model_en, text_en)
 

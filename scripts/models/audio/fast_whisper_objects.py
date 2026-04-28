@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
 """Script to download and save Hugging Face models, tokenizers, processors,
-and their associated datasets to a local backup in your user cache directory."""
+and their associated datasets to a local backup in your user cache directory.
+"""
 
-import os
+import pathlib
+import sys
+
+# Add project root to sys.path
+root_path = pathlib.Path(__file__).resolve().parents[3]
+if str(root_path) not in sys.path:
+    sys.path.insert(0, str(root_path))
 
 from huggingface_hub import snapshot_download
 from models_check import model_exists
@@ -27,15 +34,15 @@ MODELS_NAMES_EXTENDED = (
     "Systran/faster-distil-whisper-large-v3",
 )
 
-CACHE_DIR = str(config.paths.models_path / "huggingface")
+CACHE_DIR = str(config.asr.download_path)
 
 
 def get_models_to_download() -> tuple:
-    """
-    Select which Hugging Face model identifiers should be downloaded for the current platform.
+    """Select which Hugging Face model identifiers should be downloaded for the current platform.
 
     Returns:
         tuple: Tuple of model identifier strings — on Raspberry Pi this is the base models tuple, otherwise the base models concatenated with the extended models tuple.
+
     """
     # Add larger models if not on Raspberry Pi
     if not detect_raspberry_pi_model():
@@ -44,21 +51,16 @@ def get_models_to_download() -> tuple:
 
 
 def run() -> None:
-    """
-    Download the selected Hugging Face models and store them in the user's local cache.
+    """Download the selected Hugging Face models and store them in the user's local cache.
 
     Selects models appropriate for the current platform, skips models that are already present in the cache, downloads any missing models into the configured cache directory, and prints progress messages for each model.
     """
     models_to_download = get_models_to_download()
     for model_name in models_to_download:
         if model_exists(model_name, CACHE_DIR):
-            print(f"Model {model_name} already exists.")
             continue
-        print(f"Downloading and saving {model_name} to {CACHE_DIR}")
 
         snapshot_download(repo_id=model_name, repo_type="model", cache_dir=CACHE_DIR)
-        print(f"Model saved to: {os.path.join(CACHE_DIR, model_name)}")
-    print("All fast-whisper models have been downloaded and saved.")
 
 
 if __name__ == "__main__":

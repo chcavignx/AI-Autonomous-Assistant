@@ -1,1 +1,1 @@
-# !/usr/bin/env python3
+"""Utility package for shared assistant helpers."""

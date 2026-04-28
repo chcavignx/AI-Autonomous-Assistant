@@ -10,31 +10,26 @@ Here is a prioritization proposed for the context: Raspberry Pi 5, Hailo-8L, NVM
 - **Offline Voice Recognition (USB Microphone)**
   - *Why?* It is the core of user interaction, quick to set up, and resource-efficient.
   - *Technical Impact:* Low to moderate, with comprehensive documentation, abundant examples, and existing projects.
-  - *Estimated Time:* 1 to 3 days for a proof of concept.
 
 - **Offline Speech Synthesis**
   - *Why?* Provides immediate audio feedback, easy to install, with natural-sounding voices.
   - *Technical Impact:* Low, with direct integration into Python.
-  - *Estimated Time:* 1 to 2 days to test and integrate.
 
 ### 2. **Intermediate Priority: Computer Vision**
 
 - **Facial Recognition (face_recognition + official camera)**
   - *Why?* Adds a layer of personalization and security, but requires more resources and optimization.
   - *Technical Impact:* Moderate; requires proper lighting and testing on a reduced dataset.
-  - *Estimated Time:* 3 to 5 days for reliable detection on a few faces.
 
 - **Object Recognition**
   - *Why?* Advanced functionality, but more complex to integrate and optimize.
   - *Technical Impact:* High; requires model management, hardware acceleration, and extensive testing.
-  - *Estimated Time:* 5 to 8 days for smooth detection of common objects.
 
 ### 3. **Secondary Priority: Integration and User Experience**
 
 - **Module Fusion (main script, command management)**
   - *Why?* Necessary for a coherent assistant, but to be executed once the basic modules are functional.
   - *Technical Impact:* Variable, depending on the complexity of the desired interface.
-  - *Estimated Time:* 3 to 5 days for a basic integration.
 
 - **User Interface (screen, local web interface)**
   - *Why?* To enhance user experience.
@@ -53,7 +48,11 @@ Here is a prioritization proposed for the context: Raspberry Pi 5, Hailo-8L, NVM
 
 ### Proposed Sequence to Meet Constraints and Integrate Modules
 
-- **Audio Modules** (voice recognition and speech synthesis): they are quick to deploy and validate basic interaction.
+- **Audio Modules**:
+  1. Confirm the USB microphone and speaker path with [audio_usb_test.md](audio_usb_test.md).
+  2. Validate offline speech recognition with [STT_offline.md](STT_offline.md).
+  3. Validate offline text-to-speech with [TTS_offline.md](TTS_offline.md).
+  4. Verify the integrated wake-word, ASR, and TTS loop with `examples/VAD/voice_agent_offline.py`.
 - **Follow with Vision Modules**:
     1. Start with facial recognition (simpler than object recognition).
     2. Proceed to object detection.
@@ -64,16 +63,18 @@ Here is a prioritization proposed for the context: Raspberry Pi 5, Hailo-8L, NVM
 ### Sequenced Guides for Different Modules
 
 - **Audio Modules**
-    1. [Offline Speech-to-Text (STT) Guide](STT_offline.md)
-    2. [Offline Text-to-Speech (TTS) Guide](TTS_offline.md)
-    3. [Offline Speech-to-Speech demo](https://github.com/chcavignx/AI-Autonomous-Assistant/blob/main/src/audio/voice_agent_offline.md)
-        Demo application that listens to voice input from the microphone and responds with speech for specific intents (src/audio/voice_agent_offline.py)
+    1. [Offline Speech Recognition (STT)](STT_offline.md)
+    2. [Offline Text-to-Speech (TTS)](TTS_offline.md)
+    3. [Voice stack and VAD models](STS_VAD_models.md)
+    4. [USB microphone and speaker test](audio_usb_test.md)
+    5. [Offline Speech-to-Speech demo](../examples/VAD/voice_agent_offline.md)
+        Demo application that listens for a wake word, transcribes the next utterance, generates a keyword response, and speaks it back (`examples/VAD/voice_agent_offline.py`)
 
 - **Vision Modules**
-    1. [Facial Recognition Guide](facial_recognition.md **TO DO**)
-    2. [Object Recognition Guide](object_recognition.md **TO DO**)
-    3. [Object Recognition demo](object_recognition_demo.md **TO DO**)
-    Demo application that detects and labels objects in real-time. (**TO DO**)
+    1. [Facial Recognition Guide](facial_recognition.md **!TO DO!**)
+    2. [Object Recognition Guide](object_recognition.md **!TO DO!**)
+    3. [Object Recognition demo](object_recognition_demo.md **!TO DO!**)
+    Demo application that detects and labels objects in real-time. (**!TO DO!**)
 
 - **Module Integration**
 

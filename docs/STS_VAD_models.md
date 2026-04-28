@@ -158,6 +158,79 @@ Voice Activity Detection (VAD) is a critical component in modern speech processi
 | Resource-Light | 85%+ | <100ms | <200MB | Limited | Excellent |
 | Maximum Accuracy | 98%+ | 200-300ms | 1GB+ | 99+ | Good |
 
+## Implemented Solution: The `src/audio` Library
+
+The recommended stack above has been validated and implemented in the `src/audio` library used by `examples/VAD/voice_agent_offline.py`. The following section describes the architecture as it exists in code.
+
+### Overall Pipeline
+
+The library exposes three main components that map directly to the recommended architecture:
+
+- `WakeWordDetector` — wake word detection (`src/audio/wake_word.py`)
+- `ASREngine` — speech segmentation and transcription (`src/audio/asr.py`)
+- `TTSEngine` — speech synthesis (`src/audio/tts.py`)
+
+### Wake Word Detection
+
+`WakeWordDetector` uses **openWakeWord**:
+
+- Runs fully offline
+- Captures microphone input with PyAudio
+- Expects 16 kHz audio internally, resamples device audio when necessary
+- Uses a cooldown to avoid repeated triggers
+
+### Speech Recognition
+
+`ASREngine` combines VAD and STT in a single module:
+
+- PyAudio captures microphone chunks
+- **Silero VAD** detects speech vs silence — the primary segmentation engine
+- **Faster-Whisper** is the default transcription backend (OpenAI Whisper supported as alternate)
+- Falls back to a simple energy-based detector if Silero VAD is not available
+
+### Text To Speech
+
+`TTSEngine` uses **Piper**:
+
+- Piper Python API is the default path; CLI mode also supported
+- Playback handled through PyAudio
+- Speech is queued so synthesis stays non-blocking
+
+### Default Configuration
+
+```yaml
+asr.engine:       faster-whisper
+asr.model_size:   tiny
+asr.device:       cpu
+asr.compute_type: int8
+tts.engine:       piper
+tts.model_name:   en_US-hfc_female-medium.onnx
+wake.wake_word:   hey_jarvis
+```
+
+### Model Locations
+
+Models are resolved under the repository cache by default:
+
+```bash
+.cache/audio/models/           # audio models
+.cache/audio/models/wakeword/  # wake word models
+.cache/audio/models/piper/     # Piper voices
+```
+
+All paths can be overridden in `config.yaml`.
+
+### Integration Flow
+
+`examples/VAD/voice_agent_offline.py` runs a simple state machine:
+
+1. Start in wake-word mode.
+2. When the wake word is detected, switch to ASR mode.
+3. Transcribe a single utterance.
+4. Generate a response in `_generate_response()`.
+5. Speak the response.
+6. Return to wake-word mode.
+
 ## Conclusion
 
 The **Silero VAD + Faster-Whisper** combination provides the optimal solution for autonomous AI agents on Raspberry Pi 5, delivering:
@@ -168,39 +241,4 @@ The **Silero VAD + Faster-Whisper** combination provides the optimal solution fo
 - **Complete offline operation**: No cloud dependencies
 - **Multilingual support**: 99+ languages with high accuracy
 
-This architecture has been validated through extensive benchmarking and represents the current state-of-the-art for edge-deployed autonomous voice agents.
-
-
-
-Sources
-
-[1] Silero VAD: The Lightweight, High‑Precision Voice Activity ... https://blog.stackademic.com/silero-vad-the-lightweight-high-precision-voice-activity-detector-26889a862636 and
-
-https://github.com/snakers4/silero-vad.git
-
-[2] webrtcvad-wheels 2.0.10.post1 https://pypi.org/project/webrtcvad-wheels/2.0.10.post1/
-webrtcvad-wheels 2.0.14 https://pypi.org/project/webrtcvad-wheels/
-
-https://github.com/daanzu/py-webrtcvad-wheels.git
-
-[3] Pyannote: Load and Apply Speaker Diarization Offline
-https://github.com/pyannote/pyannote-audio.git
-
-[4] Using TensorFlow Lite models on the Raspberry Pi 5 ... https://www.hackster.io/news/benchmarking-tensorflow-and-tensorflow-lite-on-raspberry-pi-5-b9156d58a6a2
-
-Installing TensorFlow Lite on the Raspberry Pi https://pimylifeup.com/raspberry-pi-tensorflow-lite/
-
-[5] Faster Whisper transcription with CTranslate2 https://pypi.org/project/faster-whisper/
-Testing OpenAI Whisper on a Raspberry PI 5 : r/rasberrypi https://www.reddit.com/r/rasberrypi/comments/1enbpcp/testing_openai_whisper_on_a_raspberry_pi_5/
-OpenAI Whisper on the Raspberry Pi 4 - Live transcription https://www.maibornwolff.de/en/know-how/openai-whisper-raspberry-pi/
-
-[6] SaraEye/SaraKIT-Speech-Recognition-Vosk-Raspberry-Pi https://github.com/SaraEye/SaraKIT-Speech-Recognition-Vosk-Raspberry-Pi
-VOSK the Offline Speech Recognition https://dev.to/mattsu014/vosk-offline-speech-recognition-3kbb
-VOSK Offline Speech Recognition API https://alphacephei.com/vosk/
-Subtitle Edit: The Ultimate 2025 Guide to Effortlessly Auto ... https://an4t.com/subtitle-edit-whisper-vosk-auto-subtitles-guide/
-
-[7] Subtitle Edit: The Ultimate 2025 Guide to Effortlessly Auto ... https://an4t.com/subtitle-edit-whisper-vosk-auto-subtitles-guide/
-openai/whisper-large-v3 https://huggingface.co/openai/whisper-large-v3
-Introducing Whisper https://openai.com/index/whisper/
-Testing OpenAI Whisper on a Raspberry PI 5 : r/rasberrypi https://www.reddit.com/r/rasberrypi/comments/1enbpcp/testing_openai_whisper_on_a_raspberry_pi_5/
-Is whisper by open AI available for offline use? : r/privacy https://www.reddit.com/r/privacy/comments/15c75p1/is_whisper_by_open_ai_available_for_offline_use/
+This architecture has been validated through extensive benchmarking, represents the current state-of-the-art for edge-deployed autonomous voice agents, and is the stack the `src/audio` library is already built around.
