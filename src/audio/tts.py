@@ -25,16 +25,9 @@ from typing import BinaryIO, Protocol, cast
 # Ensure 'src' is in sys.path
 sys.path.insert(0, str(Path(os.path.join(Path(__file__).parent, "..")).resolve()))
 
-# from typing import TYPE_CHECKING
-
-# if TYPE_CHECKING:
 from typing import TYPE_CHECKING
-
 from src.audio.audio_utils import suppress_pa_stderr  # , install_alsa_error_handler
 from src.utils.config import Config
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +68,7 @@ class _PiperVoiceLike(Protocol):
     ) -> object: ...
 
 
-class TTSEngine(object):
+class TTSEngine:
     """Text-to-speech synthesis + playback using Piper.
 
     Non-blocking: queue-based, separate playback thread.
@@ -255,8 +248,8 @@ class TTSEngine(object):
                 wav_bytes = self._synthesize(text)
                 if wav_bytes:
                     self._play_wav(wav_bytes)
-            except Exception as e:
-                logger.exception("TTS playback error: %s", e)
+            except Exception:
+                logger.exception("TTS playback error")
             finally:
                 self._is_speaking.clear()
                 self._tts_queue.task_done()
@@ -284,13 +277,16 @@ class TTSEngine(object):
 
         model_file = self._config.tts.full_model_path
 
+        # Defensive check for speed to avoid ZeroDivisionError or nonsense values
+        speed = max(self._config.tts.speed, 0.01)
+
         cmd = [
             str(self._piper_bin),
             "--model",
             str(model_file),
             "--output_raw",
             "--length_scale",
-            str(1.0 / self._config.tts.speed),
+            str(1.0 / speed),
         ]
 
         try:

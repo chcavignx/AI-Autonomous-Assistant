@@ -11,9 +11,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  # Set the default log level for the tests
-  LOG_LEVEL: info
 
 jobs:
   ruff:

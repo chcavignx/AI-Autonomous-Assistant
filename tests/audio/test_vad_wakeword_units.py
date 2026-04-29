@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -35,6 +37,7 @@ def test_vad_is_speech_detected(monkeypatch):
 
 
 def test_vad_get_speech_segments(monkeypatch):
+    monkeypatch.setattr("src.audio.vad.load_silero_vad", MagicMock)
     config = Config()
     vad = VADEngine(config)
 
@@ -52,45 +55,46 @@ def test_vad_get_speech_segments(monkeypatch):
     assert result == segments
 
 
-def test_vad_get_speech_segments_error():
+def test_vad_get_speech_segments_error(monkeypatch):
+    monkeypatch.setattr("src.audio.vad.load_silero_vad", MagicMock)
     config = Config()
     vad = VADEngine(config)
 
     # Mock error
-    def mock_get_speech_timestamps(*args, **kwargs):
-        raise RuntimeError("Mock error")
+    monkeypatch.setattr("src.audio.vad.get_speech_timestamps", MagicMock(side_effect=RuntimeError("Mock error")))
 
-    import src.audio.vad as vad_module
-
-    original = vad_module.get_speech_timestamps
-    vad_module.get_speech_timestamps = mock_get_speech_timestamps
-
-    try:
-        audio = np.ones(16000, dtype=np.float32)
-        result = vad.get_speech_segments(audio)
-        assert result == []
-    finally:
-        vad_module.get_speech_timestamps = original
+    audio = np.ones(16000, dtype=np.float32)
+    result = vad.get_speech_segments(audio)
+    assert result == []
 
 
 def test_wake_word_load(monkeypatch):
-    mock_config = MagicMock()
-    mock_config.wake.full_model_path = "mock_path"
-    mock_config.cpu_cores = 4
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
 
-    loaded = {}
+        model_file = tmp_path / "mock_model.onnx"
+        model_file.touch()
 
-    def mock_Model(wakeword_models, inference_framework, **kwargs):
-        loaded["wakeword_models"] = wakeword_models
-        loaded["inference_framework"] = inference_framework
-        return "mock_model"
+        mock_config = MagicMock()
+        mock_config.wake.model_name = "mock_model"
+        mock_config.wake.full_model_path = model_file
+        mock_config.wake.inference_framework = "onnx"
+        mock_config.wake.download_path = tmp_path
+        mock_config.cpu_cores = 4
 
-    monkeypatch.setattr("openwakeword.model.Model", mock_Model)
+        loaded = {}
 
-    wwd = WakeWordDetector(mock_config)
-    wwd.load()
-    assert loaded["wakeword_models"] == ["mock_path"]
-    assert wwd._model == "mock_model"
+        def mock_Model(wakeword_models, inference_framework, **kwargs):
+            loaded["wakeword_models"] = wakeword_models
+            loaded["inference_framework"] = inference_framework
+            return "mock_model"
+
+        monkeypatch.setattr("openwakeword.model.Model", mock_Model)
+
+        wwd = WakeWordDetector(mock_config)
+        wwd.load()
+        assert loaded["wakeword_models"] == [str(model_file)]
+        assert wwd._model == "mock_model"
 
 
 def test_wake_word_detect_loop(monkeypatch):

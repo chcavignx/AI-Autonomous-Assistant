@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import cast
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .sysutils import detect_raspberry_pi_model, limit_cpu_for_multiprocessing
 
@@ -100,7 +100,7 @@ class TTSConfig(PathConfig):
     noise_scale: float = 1.0  # more audio variation
     noise_w_scale: float = 1.0  # more speaking variation
     normalize_audio: bool = True  # use raw audio from voice
-    speed: float = 1.0  # alias for length_scale
+    speed: float = Field(default=1.0, gt=0)  # alias for length_scale
     volume: float = 0.5  # output volume level
 
     @property
@@ -119,7 +119,7 @@ class WakeConfig(PathConfig):
     """Configuration for Wake Word detection settings."""
 
     wake_word: str = "hey_jarvis"
-    model_name: str | None = None
+    model_name: str = "hey_jarvis"
     model_path: str | None = None
     inference_framework: str = "onnx"  # or "pytorch" if using a PyTorch model
     threshold: float = 0.4

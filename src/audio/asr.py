@@ -408,6 +408,7 @@ class ASREngine:
     def _try_open(
         self, rate: int, dev_idx: int | None
     ) -> tuple[_PyAudioStreamLike | None, int]:
+        import pyaudio
         chunk = int(rate * self._config.audio.input_chunk_ms / 1000)
         try:
             if self._pa is None:
@@ -426,6 +427,7 @@ class ASREngine:
 
     def _open_input_stream(self) -> bool:
         """Open the microphone stream before worker threads start."""
+        import pyaudio
         model_rate = self._config.audio.input_sample_rate
         device_index = self._config.audio.input_device_index
         candidate_rates = [model_rate, 44100, 48000, 22050, 8000]
