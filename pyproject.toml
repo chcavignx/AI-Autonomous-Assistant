@@ -167,6 +167,7 @@ ignore = [
     "TRY300",  # try-else suggestions - tests often have try-except patterns
     "S404",    # subprocess import flagged as insecure - needed for testing
     "BLE001",  # blind exception catches - intentional in error handling tests
+    "PLW0108", # unused lambda result - sometimes necessary for mocking
 ]
 
 [tool.ruff.format]

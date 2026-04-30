@@ -227,8 +227,6 @@ def test_play_audio_stream_writes_chunks(monkeypatch) -> None:
     assert np.array_equal(a1=created_stream["stream"].written[0], a2=audio_data)
     assert created_stream["stream"].stopped
     assert created_stream["stream"].closed
-    assert created_stream["stream"].stopped
-    assert created_stream["stream"].closed
 
 
 def test_validate_and_clean_audio_adds_dither_to_silence() -> None:

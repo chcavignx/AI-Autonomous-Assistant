@@ -150,10 +150,10 @@ def test_asr_detect_speech_with_vad(monkeypatch):
     config: Config = Config()
     asr: ASREngine = ASREngine(config)
 
-    # Mock the VAD
-    mock_vad: MagicMock = MagicMock()
-    mock_vad.is_speech_detected.return_value = True
-    asr.vad = mock_vad
+    # Mock the VAD model callable that returns object with .item()
+    mock_vad_res = MagicMock()
+    mock_vad_res.item.return_value = 0.9
+    asr._vad_model = MagicMock(return_value=mock_vad_res)
 
     # Make chunk long enough
     chunk: bytes = b"\xff\x7f" * 6000
@@ -297,13 +297,6 @@ def test_tts_playback_loop_processes_queue(monkeypatch) -> None:
 
     synthesized: list[Any] = []
 
-    def mock_synthesize(self, text) -> Literal[b"wav_data"]:
-        synthesized.append(text)
-        return b"wav_data"
-
-    def mock_play_wav(self, data) -> None:
-        pass
-
     monkeypatch.setattr(
         "src.audio.tts.TTSEngine._synthesize", lambda _self, text: (synthesized.append(text), b"wav_data")[1]
     )
@@ -312,12 +305,19 @@ def test_tts_playback_loop_processes_queue(monkeypatch) -> None:
     tts._tts_queue.put(item="hello")
     tts._tts_queue.put(item=None)  # Sentinel
 
+    tts._playback_loop()
+    assert synthesized == ["hello"]
+
 
 def test_asr_open_input_stream(monkeypatch) -> None:
     engine: ASREngine = ASREngine(config=Config())
 
     # Mock the resolve_device_candidates to return a device
     monkeypatch.setattr("src.audio.asr.ASREngine._resolve_device_candidates", lambda _self: [None])
+
+    # Mock pyaudio
+    mock_pa = MagicMock()
+    monkeypatch.setattr("pyaudio.PyAudio", lambda: mock_pa)
 
     # Mock _try_open to return stream, chunk_frames
     mock_stream: MagicMock = MagicMock()
@@ -390,8 +390,10 @@ def test_asr_process_loop_accumulates_speech(monkeypatch) -> None:
     engine: ASREngine = ASREngine(config)
     engine._running = True
 
-    # Mock VAD to always return True/False for speech detection
-    engine._vad_model = lambda _tensor, _rate: 0.8
+    # Mock VAD to always return confidence > threshold
+    mock_vad_res = MagicMock()
+    mock_vad_res.item.return_value = 0.8
+    engine._vad_model = MagicMock(return_value=mock_vad_res)
 
     # Mock transcribe method to capture calls
     transcribe_calls: list[bytes] = []

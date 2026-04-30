@@ -406,14 +406,14 @@ class ASREngine:
         return candidates
 
     def _try_open(
-        self, rate: int, dev_idx: int | None
+        self, pa_format: int, rate: int, dev_idx: int | None
     ) -> tuple[_PyAudioStreamLike | None, int]:
         chunk = int(rate * self._config.audio.input_chunk_ms / 1000)
         try:
             if self._pa is None:
                 return None, 0
-            return self._pa.open(
-                format=pyaudio.paInt16,
+            return self._pa.open( # type: ignore[no-any-return]
+                format=pa_format,
                 channels=1,
                 rate=rate,
                 input=True,
@@ -426,6 +426,12 @@ class ASREngine:
 
     def _open_input_stream(self) -> bool:
         """Open the microphone stream before worker threads start."""
+        try:
+            import pyaudio
+        except ImportError:
+            logger.exception("pyaudio not installed. ASR will be disabled.")
+            return False
+
         model_rate = self._config.audio.input_sample_rate
         device_index = self._config.audio.input_device_index
         candidate_rates = [model_rate, 44100, 48000, 22050, 8000]
@@ -439,8 +445,8 @@ class ASREngine:
             device_candidates = self._resolve_device_candidates()
 
             for dev in device_candidates:
-                for rate in candidate_rates:
-                    s, ch = self._try_open(rate, dev)
+                for rate in candidate_rates: # type: ignore[attr-defined]
+                    s, ch = self._try_open(pyaudio.paInt16, rate, dev)
                     if s is not None:
                         stream, chunk_frames, capture_rate = s, ch, rate
                         if dev != device_index:

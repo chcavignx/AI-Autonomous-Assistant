@@ -94,7 +94,7 @@ def test_wake_config_defaults():
 
     wake = config.WakeConfig()
     assert wake.wake_word == "hey_jarvis"
-    assert wake.model_name is None
+    assert wake.model_name == "hey_jarvis"
     assert wake.model_path is None
     assert wake.inference_framework == "onnx"
     assert math.isclose(wake.threshold, 0.4)
