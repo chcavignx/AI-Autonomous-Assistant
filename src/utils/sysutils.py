@@ -4,12 +4,9 @@ import logging
 import os
 import pathlib
 import time
-from typing import TYPE_CHECKING, cast
+from typing import Any, cast
 
 import psutil
-
-if TYPE_CHECKING:
-    from psutil._ntuples import svmem
 
 logger = logging.getLogger(name=__name__)
 
@@ -18,9 +15,10 @@ logger = logging.getLogger(name=__name__)
 def print_sys_usage(_step: str) -> None:
     """Print system usage statistics."""
     cpu: float = psutil.cpu_percent(interval=0.5)
-    vm: svmem = psutil.virtual_memory()
-    used_gb = cast("float", vm.used) / 1024**3
-    total_gb = cast("float", vm.total) / 1024**3
+    # virtual_memory returns a namedtuple
+    vm: Any = psutil.virtual_memory()
+    used_gb = float(cast("float", vm.used)) / 1024**3
+    total_gb = float(cast("float", vm.total)) / 1024**3
     logger.info("%s: CPU=%.1f%% RAM=%.2f/%.2f GB", _step, cpu, used_gb, total_gb)
 
 

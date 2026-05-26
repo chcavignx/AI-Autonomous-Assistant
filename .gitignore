@@ -70,3 +70,7 @@ docs/_build/
 
 # Environment variables
 .env
+.aider*
+.agent*
+# Added by code-review-graph
+.code-review-graph/

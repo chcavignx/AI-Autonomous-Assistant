@@ -7,7 +7,7 @@ name = "ai-autonomous-assistant"
 version = "0.1.0"
 description = "AI Autonomous Assistant"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE.txt"]
 keywords = ["AI", "Autonomous", "Assistant","Raspberry PI"]
@@ -121,7 +121,11 @@ lint = [
 test = [
     "pytest>=9.0.2",
     "pytest-cov>=4.1.0",
-    "pytest-xdist>=3.0.0",
+    "pytest-mock>=3.10.0",       # mocking fluide
+    "pytest-xdist>=3.0.0",      # exécution parallèle (-n auto)
+    # "pytest-timeout>=3.0.0",    # timeout par test
+    "freezegun>=1.2.2",         # figer le temps dans les tests
+    "factory-boy>=3.2.1",       # génération de fixtures complexes
 ]
 
 [tool.ruff]
@@ -135,6 +139,7 @@ extend-exclude = [
     "src/ai_autonomous_assistant.egg-info/",
     "src/audio/",
     "src/vision/",
+    ".agents/",
 ]
 
 [tool.ruff.lint]
@@ -168,6 +173,7 @@ ignore = [
     "S404",    # subprocess import flagged as insecure - needed for testing
     "BLE001",  # blind exception catches - intentional in error handling tests
     "PLW0108", # unused lambda result - sometimes necessary for mocking
+    "FBT",     # Boolean positional arguments are normal/necessary in mocks/tests
 ]
 
 [tool.ruff.format]
@@ -223,7 +229,7 @@ norecursedirs = [
 ]
 
 [tool.basedpyright]
-pythonVersion = "3.10"
+pythonVersion = "3.11"
 venvPath = "."
 useLibraryCodeForTypes = true
 reportMissingTypeStubs = false
@@ -254,6 +260,7 @@ exclude = [
     "*.egg-info",
     "*.egg",
     "src/vision/",
+    ".agents/",
 ]
 
 # ============================================================

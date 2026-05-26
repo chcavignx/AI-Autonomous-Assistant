@@ -50,11 +50,6 @@ class PathConfig(BaseModel):
         """Returns the path to the models directory."""
         return self.cache_path / "audio" / self.models
 
-    @property
-    def models_vision_path(self) -> Path:
-        """Returns the path to the models directory."""
-        return self.cache_path / "vision" / self.models
-
 
 class ASRConfig(PathConfig):
     """Configuration for ASR (Automatic Speech Recognition / Speech-to-Text) settings."""
@@ -169,6 +164,23 @@ class AudioConfig(PathConfig):
     output_chunk_ms: int = 30  # taille des chunks audio en ms
     output_chunk_size: int = 500
     output_device_name: str | None = None  # Optional name of output device to select (overrides index if found)
+    backend: str = (
+        "auto"  # Audio backend: "pyaudio", "sounddevice", or "auto" (try sounddevice first, fallback to pyaudio)
+    )
+
+
+class CameraConfig(BaseModel):
+    """Configuration for camera settings."""
+
+    camera_index: int = 0
+    frame_width: int = 640
+    frame_height: int = 480
+
+
+class VisionConfig(PathConfig):
+    """Configuration for vision settings."""
+
+    camera: CameraConfig = Field(default_factory=CameraConfig)
 
 
 class PlatformConfig(PathConfig):
@@ -206,6 +218,15 @@ class PlatformConfig(PathConfig):
 class Config:
     """Configuration for the voice agent."""
 
+    paths: PathConfig
+    asr: ASRConfig
+    tts: TTSConfig
+    wake: WakeConfig
+    vad: VADConfig
+    audio: AudioConfig
+    vision: VisionConfig
+    platform: PlatformConfig
+
     def __init__(self, **data: object) -> None:
         """Build a configuration object from keyword data."""
         super().__init__()
@@ -215,6 +236,7 @@ class Config:
         self.wake = WakeConfig.model_validate(data.get("wake", {}))
         self.vad = VADConfig.model_validate(data.get("vad", {}))
         self.audio = AudioConfig.model_validate(data.get("audio", {}))
+        self.vision = VisionConfig.model_validate(data.get("vision", {}))
         self.platform = PlatformConfig.model_validate(data.get("platform", {}))
 
     @staticmethod
@@ -280,6 +302,7 @@ def load_config(config_path: Path | None = None) -> Config:
         config_path = ROOT_DIR / "config.yaml"
 
     # Security: Resolve paths and validate that the config is within allowed directories
+    is_safe = True
     try:
         abs_config_path = config_path.resolve()
         abs_root_dir = ROOT_DIR.resolve()
@@ -291,15 +314,15 @@ def load_config(config_path: Path | None = None) -> Config:
             or abs_root_dir in abs_config_path.parents
             or abs_user_dir in abs_config_path.parents
         )
-
-        if not is_safe:
-            msg = f"Security error: Configuration path {config_path} is outside allowed directories."
-            raise ValueError(msg)
     except (OSError, RuntimeError):
         # If path cannot be resolved, but we are trying to open it, that's a risk.
         # However, if it doesn't exist, the .exists() check below handles the UI.
         # We only block if we CAN resolve it and it's unsafe.
         pass
+
+    if not is_safe:
+        msg = f"Security error: Configuration path {config_path} is outside allowed directories."
+        raise ValueError(msg)
 
     if not config_path.exists():
         return Config()
