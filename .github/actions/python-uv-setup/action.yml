@@ -8,7 +8,7 @@ inputs:
   sync-flags:
     description: Extra flags for uv sync (e.g., --locked --group test)
     required: false
-    default: "--locked"
+    default: "--locked --all-groups"
   install-system-packages:
     description: Install Linux system packages required by audio / Raspberry Pi jobs
     required: false
