@@ -73,7 +73,6 @@ dependencies = [
     "torchaudio==2.9.1",
     "lazy-loader>=0.2.0",
     "piper-tts>=1.4.1",
-    "pyaudio>=0.2.14",
     "openwakeword>=0.1.0",
     "sounddevice>=0.5.5",
 ]
@@ -81,6 +80,9 @@ dependencies = [
 [project.optional-dependencies]
 raspberry-pi = [
     "rpi-ws281x>=0.1.0",
+]
+audio_backend = [
+    "pyaudio>=0.2.14",
 ]
 
 [tool.uv.sources]
