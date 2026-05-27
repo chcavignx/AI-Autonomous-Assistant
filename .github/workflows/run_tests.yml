@@ -22,7 +22,9 @@ jobs:
       - name: Install dependencies
         uses: ./.github/actions/python-uv-setup
         with:
-          sync-flags: "--no-default-groups --group lint"
+          enable-cache: true
+          install-system-packages: "true"
+          sync-flags: "--locked --no-default-groups --group lint"
       - name: Run Ruff linter
         run: uv run ruff check .
       - name: Run Ruff formatter
@@ -45,7 +47,8 @@ jobs:
       - name: Install dependencies
         uses: ./.github/actions/python-uv-setup
         with:
-          sync-flags: "--no-default-groups --group test"
+          enable-cache: true
+          sync-flags: "--locked --no-default-groups --group test"
       - name: Run core tests
         run: uv run pytest -n auto -m "${{ inputs.marker }}" --cov=src --cov-report=xml tests/
       - name: Upload coverage to Codecov
@@ -68,8 +71,9 @@ jobs:
       - name: Install dependencies
         uses: ./.github/actions/python-uv-setup
         with:
+          enable-cache: true
           install-system-packages: "true"
-          sync-flags: "--no-default-groups --group test --extra raspberry-pi"
+          sync-flags: "--locked --no-default-groups --group test --extra raspberry-pi"
       - name: Run Raspberry Pi profile tests
         run: uv run pytest -n auto -m "${{ inputs.marker }}" --cov=src --cov-report=xml tests/
       - name: Upload coverage to Codecov
