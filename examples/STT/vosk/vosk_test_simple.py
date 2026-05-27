@@ -4,9 +4,8 @@ import pathlib
 import sys
 import wave
 
-from vosk import KaldiRecognizer, Model, SetLogLevel
-
 from src.utils.config import config
+from vosk import KaldiRecognizer, Model, SetLogLevel
 
 # You can set log level to -1 to disable debug messages
 SetLogLevel(0)

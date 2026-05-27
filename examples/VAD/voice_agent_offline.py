@@ -21,6 +21,7 @@ import threading
 import time
 from pathlib import Path
 from types import FrameType
+from typing import final
 
 # Ensure src is in path
 project_root = Path(__file__).resolve().parent.parent.parent
@@ -31,7 +32,7 @@ from src.audio.tts import TTSEngine
 from src.audio.wake_word import WakeWordDetector
 from src.utils import config as _config_module
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(filename=str(project_root / ".tmp" / "voice_agent.log"), filemode="w", level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -39,6 +40,7 @@ _config_module.setup_python_path()
 config = _config_module.load_config()
 
 
+@final
 class SimpleVoiceAgent:
     """Minimal voice agent orchestrating ASR, TTS, and wake word detection.
 
@@ -116,6 +118,7 @@ class SimpleVoiceAgent:
     def _on_transcript_received(self, transcript: str) -> None:
         """Callback when speech is transcribed."""
         transcript = transcript.strip()
+        logger.info("🟡 Transcript received: '%s'", transcript)
         if not transcript:
             return
 
@@ -138,7 +141,7 @@ class SimpleVoiceAgent:
         """Run wake-word listening without a parallel ASR capture stream."""
         if not self.is_running:
             return
-
+        logger.info("\n🟢 Starting wake word listener, stopping ASR...")
         with self._listener_lock:
             if self._asr_active:
                 self.asr.stop()
@@ -146,12 +149,13 @@ class SimpleVoiceAgent:
             if not self._wake_active:
                 self.wake_detector.start(callback=self._on_wake_word_detected)
                 self._wake_active = True
+                logger.info(f"🎤 Listening for wake word (wake mode): '{self.config.wake.wake_word}'")
 
     def _ensure_asr_mode(self) -> None:
         """Run ASR listening without a parallel wake-word capture stream."""
         if not self.is_running:
             return
-
+        logger.info("\n⏹️ Stopping wake word listener, starting ASR...")
         with self._listener_lock:
             if self._wake_active:
                 self.wake_detector.stop()
@@ -196,7 +200,6 @@ class SimpleVoiceAgent:
         # Default response
         return f"You said: {user_input}. I'm still learning how to respond to that."
 
-
     def run(self) -> None:
         """Main event loop (simplified since threading handles listening)."""
 
@@ -206,7 +209,7 @@ class SimpleVoiceAgent:
             self.stop()
             sys.exit(0)
 
-        signal.signal(signal.SIGINT, signal_handler)
+        _ = signal.signal(signal.SIGINT, signal_handler)
 
         try:
             self.load_models()

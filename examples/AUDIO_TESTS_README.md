@@ -10,6 +10,13 @@ These tests follow a **simple-first, build-progressively** approach:
 2. **Stream Control** - Can we open/close audio streams?
 3. **Playback** - Can we play audio through output?
 4. **Recording** - Can we capture audio from input?
+5. **Recorder Standalone** - Can the simplified AudioRecorder capture and format chunks?
+6. **ASR Integration** - Can the high-level ASREngine capture and transcribe chunks?
+7. **ASR with TTS** - Can ASREngine transcribe TTS audio output?
+8. **ASR Recording Validation** - Can we transcribe microphone recordings?
+9. **Wake Word Standalone** - Can the WakeWordDetector load models and capture audio in background?
+10. **VAD Standalone** - Can the deep learning Silero VAD engine detect speech segments and handle resampling?
+11. **TTS Lifecycle & Utils** - Can we manage non-blocking TTS, interruptions, and utility conversions?
 
 Each test is **self-contained and can run independently** on any system with audio hardware.
 
@@ -86,6 +93,7 @@ python examples/test_stream_open_close.py
 - Generate a sine wave (440 Hz)
 - Send it to output stream
 - Also tests silence playback (zeros)
+- **New:** Validates `AudioPlayer.play_file()` with real WAV files.
 
 **Run:**
 
@@ -98,6 +106,7 @@ python examples/test_playback.py
 - Stream opens successfully
 - Data writes without errors
 - Stream responds to stop command
+- File-based playback routes correctly through backend
 
 **Skips if:** No output device available.
 
@@ -135,13 +144,147 @@ python examples/test_recording.py
 
 ---
 
+### 5. Recorder Standalone (`test_recorder_standalone.py`)
+
+**Purpose:** Validate the simplified `AudioRecorder` utility class.
+
+**What it tests:**
+
+- Can the recorder start/stop cleanly?
+- Does `read_numpy()` return valid 16-bit PCM?
+- Does `read_float()` return normalized [-1, 1] data?
+
+**Run:**
+
+```bash
+python examples/test_recorder_standalone.py
+```
+
+---
+
+### 6. ASR Engine Integration (`test_asr_integration.py`)
+
+**Purpose:** Verify the full ASR pipeline using the production `ASREngine`.
+
+**What it tests:**
+
+- Loads the ASR model (Whisper/Faster-Whisper)
+- Validates that the engine thread captures audio chunks
+- Checks that the VAD (Voice Activity Detection) system is initialized
+- Verifies the callback system for transcriptions
+
+**Run:**
+
+```bash
+python examples/test_asr_integration.py
+```
+
+**Skips if:** No input device available.
+
+---
+
+### 7. ASR with TTS (`test_asr_with_tts.py`)
+
+**Purpose:** Verify that the high-level `ASREngine` can accurately transcribe speech generated dynamically by the `TTSEngine` (loopback integration).
+
+**What it tests:**
+
+- Generates voice samples via PIPER `TTSEngine`
+- Feeds synthesized WAV bytes directly to the Whisper `ASREngine`
+- Asserts that original text matches transcribed text within word-error tolerance thresholds
+
+**Run:**
+
+```bash
+python examples/test_asr_with_tts.py
+```
+
+---
+
+### 8. ASR Recording Validation (`test_asr_recording_validation.py`)
+
+**Purpose:** Validate dynamic user recording capture and transcription pipeline.
+
+**What it tests:**
+
+- Records 3 seconds of active microphone input
+- Streams recording frames to `ASREngine`
+- Returns real-time speech transcription to verify complete mic-to-text pipeline
+
+**Run:**
+
+```bash
+python examples/test_asr_recording_validation.py
+```
+
+**Skips if:** No input device available.
+
+---
+
+### 9. Wake Word Standalone (`test_wake_word_standalone.py`)
+
+**Purpose:** Validate the `WakeWordDetector` engine in isolation.
+
+**What it tests:**
+
+- Loads openWakeWord models
+- Spawns background capture and detection threads
+- Verifies callback triggers upon detection
+
+**Run:**
+
+```bash
+python examples/test_wake_word_standalone.py
+```
+
+---
+
+### 10. VAD Standalone Flow (`test_vad_standalone.py`)
+
+**Purpose:** Validate voice activity detection state machines and audio sample rate converters.
+
+**What it tests:**
+
+- Initializes standalone `VADEngine` with deep-learning Silero VAD
+- Loads a real speech sample (`data/test.wav`) to verify positive speech identification (`is_speech_detected() -> True`) and correct voice active timestamps/segments (`get_speech_segments()`)
+- Tests negative identification against synthetic silence (`is_speech_detected() -> False`)
+- Tests native audio high-quality downsampling/upsampling logic (`resample_audio()`) between 16000Hz and 22050Hz
+
+**Run:**
+
+```bash
+python examples/test_vad_standalone.py
+```
+
+---
+
+### 11. TTS Lifecycle & Utils (`test_tts_lifecycle_and_utils.py`)
+
+**Purpose:** Validate advanced non-blocking TTSEngine APIs and low-level utility operations.
+
+**What it tests:**
+
+- Initializes and loads PIPER `TTSEngine` with active local models
+- Tests asynchronous dynamic speech generation (`speak(..., blocking=False)`)
+- Tests state queries (`is_speaking`) and queue interruption/abort triggers (`interrupt()`)
+- Tests synchronization blocks (`wait()`) and teardowns (`unload()`)
+- Asserts correctness of untested `audio_utils.py` functions: `convert_to_float32()`, `convert_to_int16()`, `resolve_device_index()`, `suppress_pa_stderr()`, and `install_alsa_error_handler()`
+
+**Run:**
+
+```bash
+python examples/test_tts_lifecycle_and_utils.py
+```
+
+---
+
 ## Run All Tests
 
 ```bash
 python examples/run_all_audio_tests.py
 ```
 
-Runs all 4 tests in sequence with a summary report.
+Runs all 11 tests in sequence with a summary report.
 
 ---
 

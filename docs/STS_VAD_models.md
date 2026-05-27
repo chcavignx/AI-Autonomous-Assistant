@@ -64,7 +64,7 @@ Voice Activity Detection (VAD) is a critical component in modern speech processi
 
 ## Most Appropriate Choice for AI Autonomous Agents: Silero VAD
 
-### Why Silero VAD is Optimal:
+### Why Silero VAD is Optimal
 
 1. **Ultra-lightweight**: 1-2MB model size with <1ms inference time per chunk
 2. **Multilingual capability**: Trained on 100+ languages with robust performance
@@ -109,7 +109,6 @@ Voice Activity Detection (VAD) is a critical component in modern speech processi
 | **Faster-Whisper** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ✅ Good | ⭐⭐⭐⭐⭐ | ✅ Good | Moderate |
 | **Vosk** | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ✅ Excellent | ⭐⭐⭐ | ✅ Excellent | Easy |
 | **SpeechRecognition** | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ✅ Excellent | ⭐⭐ | ✅ Excellent | Very Easy |
-
 
 ## STS Architecture Patterns for Autonomous Agents - Recommended Combinations
 
@@ -204,7 +203,7 @@ asr.model_size:   tiny
 asr.device:       cpu
 asr.compute_type: int8
 tts.engine:       piper
-tts.model_name:   en_US-hfc_female-medium.onnx
+tts.model_name:   jarvis-medium.onnx
 wake.wake_word:   hey_jarvis
 ```
 

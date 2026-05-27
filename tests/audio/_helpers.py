@@ -41,26 +41,19 @@ def has_asr_model_cached(config) -> bool:
 
 
 def get_input_device_index() -> int | None:
-    """Return the first PyAudio input device index, if available.
+    """Return the first input device index, if available.
 
     Returns:
         int | None: The index of the first available input device, or None.
 
     """
-    try:
-        import pyaudio
-    except ImportError:
-        return None
+    from src.audio.audio_utils import get_default_input_device
 
-    pa = pyaudio.PyAudio()
     try:
-        for index in range(pa.get_device_count()):
-            info = pa.get_device_info_by_index(index)
-            if info.get("maxInputChannels", 0):
-                return int(info.get("index", index))
-    finally:
-        pa.terminate()
-    return None
+        dev = get_default_input_device()
+        return dev.index if dev else None
+    except Exception:
+        return None
 
 
 def has_input_device() -> bool:

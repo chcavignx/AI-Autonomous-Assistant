@@ -124,6 +124,7 @@ def test_wake_word_detect_loop(monkeypatch):
 
 def test_wake_word_open_input_stream(monkeypatch):
     config = Config()
+    config.audio.backend = "pyaudio"
     wwd = WakeWordDetector(config)
 
     mock_pa = MagicMock()

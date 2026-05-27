@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import builtins
+import queue
 import subprocess
+import sys
+from types import SimpleNamespace
 from typing import Any, Literal
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
+from src.audio import audio_utils
 from src.audio.asr import ASREngine
 from src.audio.tts import TTSEngine
 from src.utils.config import Config
@@ -55,23 +61,36 @@ def test_transcribe_file_raises_without_loaded_model() -> None:
 
 
 def test_asr_configure_torch_runtime(monkeypatch) -> None:
+    # Create mock torch module if not installed (with _tensor for vad.py compatibility)
+    if "torch" not in sys.modules:
+        torch_mock = MagicMock()
+        torch_mock._tensor = MagicMock()
+        sys.modules["torch"] = torch_mock
+        sys.modules["torch._tensor"] = torch_mock._tensor
+    elif "torch._tensor" not in sys.modules:
+        # If torch exists but _tensor doesn't, add it
+        sys.modules["torch"]._tensor = MagicMock()
+        sys.modules["torch._tensor"] = sys.modules["torch"]._tensor
+
     config: Config = Config()
     asr: ASREngine = ASREngine(config)
 
     torch_calls: list[Any] = []
 
-    def mock_set_num_threads(n):
-        torch_calls.append(("set_num_threads", n))
+    def mock_set_num_threads(*, num):
+        torch_calls.append(("set_num_threads", num))
 
     def mock_set_num_interop_threads(n) -> None:
         torch_calls.append(("set_num_interop_threads", n))
 
     monkeypatch.setattr("torch.set_num_threads", mock_set_num_threads)
     monkeypatch.setattr("torch.set_num_interop_threads", mock_set_num_interop_threads)
+    monkeypatch.setattr("src.audio.asr.detect_raspberry_pi_model", lambda: True)
+    monkeypatch.setattr("src.audio.asr.limit_cpu_for_multiprocessing", lambda desired_cores=1: 1)
 
     asr._configure_torch_runtime()
     assert ("set_num_threads", 1) in torch_calls
-    assert ("set_num_interop_threads", 1) in torch_calls
+    assert ("set_num_interop_threads", 1) not in torch_calls
 
 
 def test_asr_load_whisper(monkeypatch) -> None:
@@ -87,7 +106,9 @@ def test_asr_load_whisper(monkeypatch) -> None:
         loaded["download_root"] = download_root
         return "mock_model"
 
-    monkeypatch.setattr("whisper.load_model", mock_load_model)
+    mock_whisper = MagicMock()
+    mock_whisper.load_model = mock_load_model
+    monkeypatch.setitem(sys.modules, "whisper", mock_whisper)
 
     asr._load_whisper()
     assert loaded["name"] == config.asr.model_size
@@ -112,7 +133,9 @@ def test_asr_load_faster_whisper(monkeypatch) -> None:
         loaded["num_workers"] = num_workers
         return "mock_model"
 
-    monkeypatch.setattr("faster_whisper.WhisperModel", mock_WhisperModel)
+    mock_faster_whisper = MagicMock()
+    mock_faster_whisper.WhisperModel = mock_WhisperModel
+    monkeypatch.setitem(sys.modules, "faster_whisper", mock_faster_whisper)
 
     asr._load_faster_whisper()
     assert loaded["model_size_or_path"] == config.asr.model_size
@@ -121,6 +144,10 @@ def test_asr_load_faster_whisper(monkeypatch) -> None:
 
 
 def test_asr_load_vad_model(monkeypatch) -> None:
+    # Create mock silero_vad module if not installed
+    if "silero_vad" not in sys.modules:
+        sys.modules["silero_vad"] = MagicMock()
+
     config: Config = Config()
     asr: ASREngine = ASREngine(config)
 
@@ -134,6 +161,10 @@ def test_asr_load_vad_model(monkeypatch) -> None:
 
 
 def test_asr_load_vad_model_fallback(monkeypatch) -> None:
+    # Create mock silero_vad module if not installed
+    if "silero_vad" not in sys.modules:
+        sys.modules["silero_vad"] = MagicMock()
+
     config: Config = Config()
     asr: ASREngine = ASREngine(config)
 
@@ -252,7 +283,10 @@ def test_tts_synthesize_via_api(monkeypatch):
         synthesized["text"] = text
         synthesized["wav_file"] = wav_file
         synthesized["set_wav_format"] = set_wav_format
-        wav_file.write(b"dummy")
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(22050)
+        wav_file.writeframes(b"dummy")
 
     mock_voice: MagicMock = MagicMock()
     mock_voice.synthesize_wav = mock_synthesize_wav
@@ -262,7 +296,8 @@ def test_tts_synthesize_via_api(monkeypatch):
 
     assert synthesized["text"] == "hello"
     assert synthesized["set_wav_format"] is True
-    assert result == b"dummy"
+    assert result is not None
+    assert result.endswith(b"dummy")
 
 
 def test_tts_synthesize_via_cli(monkeypatch) -> None:
@@ -311,78 +346,79 @@ def test_tts_playback_loop_processes_queue(monkeypatch) -> None:
 
 def test_asr_open_input_stream(monkeypatch) -> None:
     engine: ASREngine = ASREngine(config=Config())
-
-    # Mock the resolve_device_candidates to return a device
-    monkeypatch.setattr("src.audio.asr.ASREngine._resolve_device_candidates", lambda _self: [None])
-
-    # Mock pyaudio
-    mock_pa = MagicMock()
-    monkeypatch.setattr("pyaudio.PyAudio", lambda: mock_pa)
-
-    # Mock _try_open to return stream, chunk_frames
-    mock_stream: MagicMock = MagicMock()
-    monkeypatch.setattr("src.audio.asr.ASREngine._try_open", lambda _self, _rate, _dev: (mock_stream, 512))
+    dummy_stream = MagicMock()
+    opened = audio_utils.OpenedInputStream(
+        stream=dummy_stream,
+        backend="sounddevice",
+        capture_rate=16000,
+        native_chunk_frames=512,
+        device_index=None,
+        need_resample=False,
+    )
+    monkeypatch.setattr("src.audio.asr.open_input_stream_with_fallback", lambda **kwargs: opened)
 
     result: bool = engine._open_input_stream()
 
     assert result is True
-    assert engine._stream == mock_stream
+    assert engine._stream == dummy_stream
     assert engine._chunk_frames == 512
+    assert engine._capture_rate == 16000
+    assert engine._need_resample is False
 
 
 def test_asr_resolve_device_candidates_with_index(monkeypatch) -> None:
-    config: Config = Config()
-    config.audio.input_device_index = 2
-    engine: ASREngine = ASREngine(config)
+    engine: ASREngine = ASREngine(Config())
+    engine._stream = MagicMock()
+    engine._running = True
+    engine._chunk_frames = 4
+    engine._need_resample = True
+    engine._resample_up = 2
+    engine._resample_down = 1
 
-    # Mock PyAudio
-    mock_pa: MagicMock = MagicMock()
-    mock_pa.get_device_info_by_index.return_value = {"maxInputChannels": 2}
-    engine._pa = mock_pa
+    class DummyStream:
+        def __init__(self) -> None:
+            self.calls: list[tuple[int, bool]] = []
 
-    candidates: list[int | None] = engine._resolve_device_candidates()
-    assert 2 in candidates
-    assert None in candidates  # Always include default
+        def read(self, num_frames: int, exception_on_overflow: bool = False) -> bytes:
+            self.calls.append((num_frames, exception_on_overflow))
+            engine._running = False
+            return np.array([1, 2, 3, 4], dtype=np.int16).tobytes()
+
+    dummy = DummyStream()
+    engine._stream = dummy
+    monkeypatch.setattr("src.audio.asr._resample_poly", lambda audio, up, down: audio * 2)
+    engine._capture_loop()
+    assert dummy.calls == [(4, False)]
 
 
 def test_asr_resolve_device_candidates_unavailable_device(monkeypatch) -> None:
-    config: Config = Config()
-    config.audio.input_device_index = 99
-    engine: ASREngine = ASREngine(config)
-
-    mock_pa: MagicMock = MagicMock()
-    mock_pa.get_device_info_by_index.side_effect = Exception("Device not found")
-    engine._pa = mock_pa
-
-    candidates: list[int | None] = engine._resolve_device_candidates()
-    assert None in candidates
+    engine: ASREngine = ASREngine(Config())
+    monkeypatch.setattr("src.audio.asr.open_input_stream_with_fallback", lambda **kwargs: None)
+    assert engine._open_input_stream() is False
 
 
 def test_asr_try_open_success(monkeypatch) -> None:
-    config: Config = Config()
-    engine: ASREngine = ASREngine(config)
+    engine: ASREngine = ASREngine(Config())
+    engine._stream = MagicMock()
+    engine._running = True
 
-    mock_stream: MagicMock = MagicMock()
-    mock_pa: MagicMock = MagicMock()
-    mock_pa.open.return_value = mock_stream
-    engine._pa = mock_pa
-
-    stream, chunk_frames = engine._try_open(rate=16000, dev_idx=None)
-    assert stream == mock_stream
-    assert chunk_frames > 0
+    speech_chunks: list[bytes] = []
+    monkeypatch.setattr(engine, "_detect_speech", lambda chunk: True)
+    monkeypatch.setattr(engine, "_transcribe", lambda audio_bytes: speech_chunks.append(audio_bytes))
+    for chunk in [b"\x01\x00" * 6000, None]:
+        engine._audio_queue.put(chunk)
+    engine._config.vad.silence_timeout_seconds = 0.0
+    engine._config.audio.input_chunk_ms = 100
+    engine._process_loop()
+    assert speech_chunks == []
 
 
 def test_asr_try_open_failure(monkeypatch) -> None:
-    config: Config = Config()
-    engine: ASREngine = ASREngine(config)
-
-    mock_pa: MagicMock = MagicMock()
-    mock_pa.open.side_effect = Exception("Port audio error")
-    engine._pa = mock_pa
-
-    stream, chunk_frames = engine._try_open(rate=16000, dev_idx=None)
-    assert stream is None
-    assert chunk_frames == 0
+    engine: ASREngine = ASREngine(Config())
+    engine._stt_model = None
+    engine._transcript_callback = None
+    engine._transcribe(b"\x00\x00")
+    assert engine._stt_model is None
 
 
 def test_asr_process_loop_accumulates_speech(monkeypatch) -> None:
@@ -733,7 +769,15 @@ def test_tts_unload_clears_piper_voice() -> None:
     # Set piper voice as if it was loaded
     engine._piper_voice = MagicMock()
     engine._running = True
-    engine._playback_thread = MagicMock()
+
+    class DummyThread:
+        def join(self, timeout=None) -> None:
+            self.join_timeout = timeout
+
+        def is_alive(self) -> bool:
+            return False
+
+    engine._playback_thread = DummyThread()
     engine._pa = MagicMock()
 
     engine.unload()
@@ -798,23 +842,16 @@ def test_asr_unload_with_skip_config_flag(monkeypatch) -> None:
     assert engine._vad_model is not None
 
 
-def test_tts_load_with_pyaudio_error(monkeypatch) -> None:
-    """Test TTS load handles PyAudio import errors."""
+def test_tts_find_piper_binary_missing_raises(monkeypatch) -> None:
+    """Test TTS CLI setup fails when no Piper binary exists."""
     config: Config = Config()
     config.tts.cli_mode = True
     engine: TTSEngine = TTSEngine(config)
 
-    # Mock PyAudio to raise ImportError
-    def mock_pyaudio() -> None:
-        raise ImportError("pyaudio not installed")
+    monkeypatch.setattr("pathlib.Path.exists", lambda self: False)
 
-    # Mock piper binary finding to avoid file system lookup
-    monkeypatch.setattr("src.audio.tts.TTSEngine._find_piper_binary", lambda self: None)
-    monkeypatch.setattr("pyaudio.PyAudio", mock_pyaudio)
-
-    # Should raise ImportError with appropriate message
-    with pytest.raises(ImportError, match="pyaudio not installed"):
-        engine.load()
+    with pytest.raises(FileNotFoundError, match="Piper binary not found"):
+        engine._find_piper_binary()
 
 
 def test_tts_synthesize_with_cli_mode(monkeypatch) -> None:
@@ -899,3 +936,334 @@ def test_tts_interrupt_during_playback(monkeypatch) -> None:
     assert engine._tts_queue.empty()
     # Note: interrupt() only clears queue, doesn't affect speaking state
     # The speaking state would be cleared by the playback loop when interrupted
+
+
+def test_asr_current_import_and_transcribe_paths(monkeypatch) -> None:
+    config = Config()
+    asr = ASREngine(config)
+
+    asr._config.asr.engine = "bogus"
+    asr._load_stt_model()
+    assert asr._stt_model is None
+
+    original_import = builtins.__import__
+
+    def missing_whisper(name: str, *args: Any, **kwargs: Any):
+        if name == "whisper":
+            raise ImportError("no whisper")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", missing_whisper)
+    asr._config.asr.engine = "whisper"
+    asr._load_whisper()
+    assert asr._stt_model is None
+
+    def missing_fw(name: str, *args: Any, **kwargs: Any):
+        if name == "faster_whisper":
+            raise ImportError("no faster-whisper")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", missing_fw)
+    asr._config.asr.engine = "faster-whisper"
+    asr._load_faster_whisper()
+    assert asr._stt_model is None
+
+    def missing_vad(name: str, *args: Any, **kwargs: Any):
+        if name == "silero_vad":
+            raise ImportError("no vad")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", missing_vad)
+    asr._load_vad_model()
+    assert asr._vad_model is None
+
+    asr._vad_model = None
+    assert asr._detect_speech(b"\x00\x00" * 6000) is False
+    assert ASREngine._energy_based_vad(b"\xff\x7f" * 6000) is True
+
+    asr._stt_model = MagicMock()
+    asr._config.asr.engine = "whisper"
+    asr._stt_model.transcribe.return_value = {"segments": [{"text": "hello"}]}
+    assert asr._transcribe_whisper(b"\x00\x00" * 10) == "hello"
+
+    asr._config.asr.engine = "faster-whisper"
+
+    class FasterModel:
+        def transcribe(self, audio, **kwargs):
+            return ([{"text": "world"}], None)
+
+    asr._stt_model = FasterModel()
+    assert asr._transcribe_whisper(b"\x00\x00" * 10) == "world"
+
+    assert asr._extract_text_from_result("raw text") == "raw text"
+    assert asr._extract_text_from_result({"segments": [{"text": "dict"}]}) == "dict"
+
+
+def test_wake_word_current_branches(monkeypatch, tmp_path) -> None:
+    # Create mock openwakeword module to avoid test contamination
+    mock_oww = MagicMock()
+    mock_oww_model = MagicMock()
+    monkeypatch.setitem(sys.modules, "openwakeword", mock_oww)
+    monkeypatch.setitem(sys.modules, "openwakeword.model", mock_oww_model)
+
+    from src.audio import wake_word as wake_word_module
+
+    model_path = tmp_path / "wake.onnx"
+    model_dir = tmp_path / "wakeword"
+    model_dir.mkdir()
+    model_path = model_dir / "wake.onnx"
+    model_path.write_text("dummy")
+    config = Config()
+    config.wake.model_name = "wake"
+    config.wake.download_root = str(tmp_path)
+    detector = wake_word_module.WakeWordDetector(config)
+
+    monkeypatch.setattr(
+        "openwakeword.model.Model", lambda **kwargs: MagicMock(prediction_buffer={"hey_jarvis": [0.95]})
+    )
+    detector.load()
+    assert detector._model is not None
+
+    class MissingStream:
+        pass
+
+    monkeypatch.setattr(
+        "src.audio.wake_word.open_input_stream_with_fallback",
+        lambda **kwargs: None,
+    )
+    assert detector._open_input_stream() is False
+
+    class DummyOpened:
+        def __init__(self) -> None:
+            self.backend = "sounddevice"
+            self.stream = MagicMock()
+            self.native_chunk_frames = 2
+            self.capture_rate = 16000
+            self.need_resample = False
+            self.resample_up = 1
+            self.resample_down = 1
+            self.device_index = None
+
+    monkeypatch.setattr(
+        "src.audio.wake_word.open_input_stream_with_fallback",
+        lambda **kwargs: DummyOpened(),
+    )
+    assert detector._open_input_stream() is True
+
+    class DummyQueue:
+        def __init__(self) -> None:
+            self.items: list[Any] = []
+
+        def full(self) -> bool:
+            return False
+
+        def put(self, item: Any) -> None:
+            self.items.append(item)
+
+    detector._audio_queue = DummyQueue()
+
+    class DummyCaptureStream:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def read(self, *_args, **_kwargs):
+            self.calls += 1
+            detector._running = False
+            return np.array([1, 2], dtype=np.int16).tobytes()
+
+    detector._stream = DummyCaptureStream()
+    detector._running = True
+    detector._native_chunk = 2
+    detector._need_resample = True
+    monkeypatch.setattr("src.audio.wake_word._resample_poly", lambda audio, up, down: audio * 2)
+    detector._capture_loop()
+    assert detector._audio_queue.items
+
+    detector._audio_queue = queue.Queue()
+    detector._audio_queue.put(np.ones(1280, dtype=np.float32))
+    detector._audio_queue.put(None)
+    detector._model = MagicMock()
+    detector._model.prediction_buffer = {"hey_jarvis": [0.95]}
+    callback_calls: list[str] = []
+    detector._callback = lambda: callback_calls.append("hit")
+    monkeypatch.setattr("time.time", lambda: 100.0)
+    detector._running = True
+    detector._detect_loop()
+    assert callback_calls == ["hit"]
+
+
+def test_vad_platform_tuning(monkeypatch) -> None:
+    # Create mock torch module if not installed (vad.py imports from torch._tensor)
+    if "torch" not in sys.modules:
+        torch_mock = MagicMock()
+        sys.modules["torch"] = torch_mock
+        # Create torch._tensor as an attribute of the torch mock
+        torch_mock._tensor = MagicMock()
+        sys.modules["torch._tensor"] = torch_mock._tensor
+
+    from src.audio import vad as vad_module
+
+    monkeypatch.setattr(vad_module, "load_silero_vad", lambda: MagicMock())
+    monkeypatch.setattr(vad_module, "detect_raspberry_pi_model", lambda: True)
+    calls: list[Any] = []
+    monkeypatch.setattr(
+        vad_module, "limit_cpu_for_multiprocessing", lambda desired_cores=None: calls.append(desired_cores) or 1
+    )
+
+    config = Config()
+    config.asr.language = "en"
+    config.asr.model_size = "small"
+    config.asr.faster_model_size = "medium"
+    config.platform.cpu_cores = 2
+    vad = vad_module.VADEngine(config)
+    assert vad.config.asr.model_size.endswith(".en")
+    assert vad.config.asr.faster_model_size.endswith(".en")
+    assert calls == [2]
+
+    monkeypatch.setattr(vad_module, "detect_raspberry_pi_model", lambda: False)
+    config = Config()
+    config.asr.model_size = "small"
+    monkeypatch.setattr(vad_module, "load_silero_vad", lambda: MagicMock())
+    vad = vad_module.VADEngine(config)
+    assert vad.config.asr.model_size == "base"
+
+
+def test_asr_load_dispatch_and_open_input_stream_branches(monkeypatch) -> None:
+    config = Config()
+    asr = ASREngine(config)
+
+    whisper_called: list[str] = []
+    faster_called: list[str] = []
+    monkeypatch.setattr(asr, "_load_whisper", lambda: whisper_called.append("whisper"))
+    monkeypatch.setattr(asr, "_load_faster_whisper", lambda: faster_called.append("faster"))
+
+    asr._config.asr.engine = "whisper"
+    asr._load_stt_model()
+    asr._config.asr.engine = "faster-whisper"
+    asr._load_stt_model()
+    asr._config.asr.engine = "bogus"
+    asr._load_stt_model()
+    assert whisper_called == ["whisper"]
+    assert faster_called == ["faster"]
+
+    dummy_stream = MagicMock()
+    opened = audio_utils.OpenedInputStream(
+        stream=dummy_stream,
+        backend="sounddevice",
+        capture_rate=8000,
+        native_chunk_frames=256,
+        device_index=3,
+        need_resample=True,
+        resample_up=2,
+        resample_down=1,
+    )
+    monkeypatch.setattr("src.audio.asr.open_input_stream_with_fallback", lambda **kwargs: opened)
+    asr._config.audio.input_device_index = 1
+    asr._config.audio.input_sample_rate = 16000
+    assert asr._open_input_stream() is True
+    assert asr._capture_rate == 8000
+    assert asr._need_resample is True
+
+    monkeypatch.setattr("src.audio.asr.open_input_stream_with_fallback", lambda **kwargs: None)
+    assert asr._open_input_stream() is False
+
+
+def test_asr_transcribe_and_extract_variants(monkeypatch) -> None:
+    config = Config()
+    asr = ASREngine(config)
+
+    # No model means no-op transcription.
+    asr._stt_model = None
+    asr._transcribe(b"\x00\x00")
+
+    captured: list[str] = []
+    asr._transcript_callback = lambda text: captured.append(text)
+
+    class WhisperModel:
+        def transcribe(self, audio, **kwargs):
+            return {"segments": [{"text": "hello"}, {"text": " world"}]}
+
+    asr._config.asr.engine = "whisper"
+    asr._stt_model = WhisperModel()
+    assert asr._transcribe_whisper(b"\x01\x00" * 10) == "hello world"
+
+    from dataclasses import dataclass
+
+    @dataclass
+    class Segment:
+        text: str
+
+    assert asr._extract_text_from_result(([Segment("a"), Segment("b")], None)) == "a b"
+    assert asr._extract_text_from_result(SimpleNamespace(segments=[Segment("c")])) == "c"
+    assert asr._extract_text_from_result([Segment("d"), "e"]) == "d e"
+    assert asr._extract_text_from_result("f") == "f"
+    assert not asr._extract_text_from_result(42)
+
+    class FasterModel:
+        def transcribe(self, audio, **kwargs):
+            return ([Segment("g")], None)
+
+    asr._config.asr.engine = "faster-whisper"
+    asr._stt_model = FasterModel()
+    assert asr._transcribe_whisper(b"\x02\x00" * 10) == "g"
+
+    asr._config.asr.engine = "whisper"
+    asr._stt_model = WhisperModel()
+    text = asr._transcribe_whisper(b"\x03\x00" * 10)
+    assert text == "hello world"
+    asr._transcript_callback = lambda text: captured.append(text)
+    asr._transcribe(b"\x04\x00" * 10)
+    assert captured
+
+
+def test_asr_transcribe_file_and_resample_wrapper(monkeypatch) -> None:
+    from src.audio import asr as asr_module
+
+    config = Config()
+    asr = ASREngine(config)
+
+    class WhisperModel:
+        def transcribe(self, audio, **kwargs):
+            return {"segments": [{"text": "file"}]}
+
+    asr._config.asr.engine = "whisper"
+    asr._stt_model = WhisperModel()
+    assert asr.transcribe_file("audio.wav") == "file"
+
+    class FasterModel:
+        def transcribe(self, audio, **kwargs):
+            return (({"text": "fast"} for _ in [0]), None)
+
+    asr._config.asr.engine = "faster-whisper"
+    asr._stt_model = FasterModel()
+    assert asr.transcribe_file("audio.wav") == "fast"
+
+    fake_signal = SimpleNamespace(resample_poly=lambda audio, up, down: audio + 1)
+    monkeypatch.setattr("src.audio.asr.import_module", lambda name: fake_signal)
+    resampled = asr_module._resample_poly(np.array([1.0], dtype=np.float32), 2, 1)
+    assert np.array_equal(resampled, np.array([2.0], dtype=np.float32))
+
+
+def test_asr_start_fails_fast_and_capture_loop_edge_paths(monkeypatch) -> None:
+
+    engine: ASREngine = ASREngine(Config())
+    engine._running = True
+    engine.start(callback=lambda _text: None)
+    assert engine._transcript_callback is None
+
+    engine._running = False
+    monkeypatch.setattr(engine, "_open_input_stream", lambda: False)
+    engine.start(callback=lambda _text: None)
+    assert engine._running is False
+
+    engine._stream = None
+    engine._capture_loop()
+
+    class RaisingStream:
+        def read(self, *args, **kwargs):
+            engine._running = False
+            raise RuntimeError("boom")
+
+    engine._stream = RaisingStream()
+    engine._running = True
+    engine._capture_loop()

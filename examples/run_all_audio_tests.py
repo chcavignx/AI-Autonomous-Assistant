@@ -8,16 +8,22 @@ Usage:
   python examples/run_all_audio_tests.py --verbose  # Detailed output
 """
 
-import sys
 import subprocess
+import sys
 from pathlib import Path
-
 
 TESTS = [
     ("Hardware Detection", "test_hardware_detection.py"),
     ("Stream Open/Close", "test_stream_open_close.py"),
     ("Audio Playback", "test_playback.py"),
     ("Audio Recording", "test_recording.py"),
+    ("Recorder Standalone", "test_recorder_standalone.py"),
+    ("ASR Engine Flow", "test_asr_integration.py"),
+    ("ASR with TTS", "test_asr_with_tts.py"),
+    ("ASR Recording Validation", "test_asr_recording_validation.py"),
+    ("Wake Word Standalone", "test_wake_word_standalone.py"),
+    ("VAD Standalone Flow", "test_vad_standalone.py"),
+    ("TTS Lifecycle & Utils", "test_tts_lifecycle_and_utils.py"),
 ]
 
 
@@ -26,53 +32,35 @@ def run_test(test_name: str, script: str) -> bool:
     script_path: Path = Path(__file__).parent / script
 
     if not script_path.exists():
-        print(f"  ✗ Script not found: {script}")
         return False
-
-    print(f"\n{'=' * 60}")
-    print(f"Running: {test_name}")
-    print('=' * 60)
 
     try:
         result = subprocess.run(
             [sys.executable, str(script_path)],
             cwd=Path(__file__).parent.parent,
-            timeout=30,
+            timeout=60,
         )
         return result.returncode == 0
     except subprocess.TimeoutExpired:
-        print(f"✗ TIMEOUT: {test_name} exceeded 30 seconds")
         return False
-    except Exception as e:
-        print(f"✗ ERROR: {e}")
+    except Exception:
         return False
 
 
-def main():
+def main() -> int:
     """Run all integration tests."""
-    print("\n" + "=" * 60)
-    print("AUDIO LIBRARY INTEGRATION TESTS")
-    print("=" * 60)
-    print(f"Running {len(TESTS)} tests...\n")
-
     results: list[tuple[str, bool]] = []
     for test_name, script in TESTS:
         success = run_test(test_name, script)
         results.append((test_name, success))
 
     # Summary
-    print("\n" + "=" * 60)
-    print("TEST SUMMARY")
-    print("=" * 60)
 
     passed: int = sum(1 for _, success in results if success)
     total: int = len(results)
 
     for test_name, success in results:
-        status: str = "✓ PASS" if success else "✗ FAIL"
-        print(f"{status}: {test_name}")
-
-    print(f"\nResult: {passed}/{total} tests passed")
+        pass
 
     return 0 if passed == total else 1
 

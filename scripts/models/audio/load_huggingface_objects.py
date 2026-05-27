@@ -4,12 +4,12 @@ and their associated datasets to a local backup in your user cache directory.
 """
 
 import os
+import pathlib
+import sys
 
 from dotenv import load_dotenv
 from huggingface_hub import login, snapshot_download
 from huggingface_hub.errors import GatedRepoError, RepositoryNotFoundError
-import pathlib
-import sys
 from models_check import model_exists
 
 # Add project root to sys.path
@@ -25,8 +25,8 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 
 if HF_TOKEN:
     login(token=HF_TOKEN)
-else:
-    print("Warning: HF_TOKEN not set. Some gated models may not be accessible.")
+
+import contextlib
 
 from src.utils.config import config
 
@@ -53,23 +53,19 @@ def run() -> None:
     for model_name in MODEL_NAMES:
         if model_exists(model_name, CACHE_DIR):
             continue
-        try:
+        with contextlib.suppress(RepositoryNotFoundError, GatedRepoError):
             snapshot_download(
                 repo_id=model_name, repo_type="model", cache_dir=CACHE_DIR
             )
-        except (RepositoryNotFoundError, GatedRepoError):
-            pass
 
     for data_set_name in DATA_SET_NAMES:
         if model_exists(data_set_name, CACHE_DIR):
             continue
         # Load a hosted dataset
-        try:
+        with contextlib.suppress(RepositoryNotFoundError, GatedRepoError):
             snapshot_download(
                 repo_id=data_set_name, repo_type="dataset", cache_dir=CACHE_DIR
             )
-        except (RepositoryNotFoundError, GatedRepoError):
-            pass
 
 
 if __name__ == "__main__":

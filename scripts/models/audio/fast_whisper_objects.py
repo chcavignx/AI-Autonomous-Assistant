@@ -13,7 +13,6 @@ if str(root_path) not in sys.path:
 
 from huggingface_hub import snapshot_download
 from models_check import model_exists
-
 from src.utils.config import config
 from src.utils.sysutils import detect_raspberry_pi_model
 

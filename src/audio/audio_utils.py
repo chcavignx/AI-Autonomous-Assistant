@@ -130,9 +130,9 @@ def get_audio_backend(config: Config | None = None) -> str:
     # Verify the requested backend is available
     try:
         if backend == "sounddevice":
-            import sounddevice # pyright: ignore[reportUnusedImport]
+            import sounddevice
         else:
-            import pyaudio # pyright: ignore[reportUnusedImport]
+            import pyaudio
     except ImportError as e:
         logger.warning(
             "Requested audio backend '%s' not available: %s. Falling back to auto-detection.",
@@ -338,7 +338,6 @@ def list_audio_devices(backend: str | None = None) -> list[AudioDeviceInfo]:
         try:
             import sounddevice as sd
             # sd_devices is a DeviceList
-            # pyright: ignore[reportUnknownMemberType, reportExplicitAny]
             sd_devices = cast(list[dict[str, object]], sd.query_devices())
 
             for i, dev in enumerate(sd_devices):
@@ -360,7 +359,6 @@ def list_audio_devices(backend: str | None = None) -> list[AudioDeviceInfo]:
             pa = pyaudio.PyAudio()
             try:
                 for i in range(pa.get_device_count()):
-                    # pyright: ignore[reportUnknownMemberType]
                     dev_info = cast(dict[str, object], pa.get_device_info_by_index(i))
                     devices.append(AudioDeviceInfo(
                         index=i,
@@ -646,9 +644,8 @@ def resample_audio(
         up = target_rate // g
         down = original_rate // g
 
-        # resample_poly is from scipy.signal
-        # pyright: ignore[reportExplicitAny, reportUnknownVariableType]
-        return cast(NDArray[np.float32], cast(Any, resample_poly)(audio, up, down).astype(np.float32))
+        _audio: NDArray[np.float32] = resample_poly(audio, up, down).astype(np.float32)
+        return _audio
     except ImportError:
         logger.warning("scipy not available, using simple resampling")
         # Simple resampling as fallback
@@ -698,7 +695,12 @@ class AudioStream(ABC):
         self._active = False
 
     @abstractmethod
-    def start(self) -> bool:
+    def start(self) -> None:
+        """Start the stream."""
+        pass
+
+    @abstractmethod
+    def stop(self) -> None:
         """Start the stream.
 
         Returns:
@@ -740,7 +742,7 @@ class AudioInputStream(AudioStream):
 
     @abstractmethod
     @override
-    def start(self) -> bool:
+    def start(self) -> None:
         """Start the stream."""
         pass
 
@@ -797,7 +799,7 @@ class AudioOutputStream(AudioStream):
 
     @abstractmethod
     @override
-    def start(self) -> bool:
+    def start(self) -> None:
         """Start the stream."""
         pass
 
@@ -822,8 +824,8 @@ class AudioOutputStream(AudioStream):
         if self._stream is not None:
             try:
                 if hasattr(self._stream, 'close'):
-                    # pyright: ignore[reportExplicitAny]
-                    _ = cast(Any, self._stream).close()
+                    # pyright: ignore[reportAttributeAccessIssue]
+                    self._stream.close()
             except Exception as e:
                 logger.debug("Error closing stream: %s", e)
             self._stream = None
@@ -898,15 +900,15 @@ class SoundDeviceInputStream(AudioInputStream):
                 device=self.device_index,
                 callback=_callback,
             )
-            # pyright: ignore[reportExplicitAny]
-            _ = cast(Any, self._stream).start()
+            # pyright: ignore[reportAttributeAccessIssue]
+            self._stream.start()
             self._active = True
-            return True
 
         except Exception as e:
             logger.debug("Failed to start SoundDevice input stream: %s", e)
             self._active = False
-            return False
+
+        return self._active
 
     @override
     def read(self, num_frames: int, exception_on_overflow: bool = False) -> bytes | None:
@@ -925,7 +927,8 @@ class SoundDeviceInputStream(AudioInputStream):
         if self._stream is not None:
             try:
                 # pyright: ignore[reportExplicitAny]
-                _ = cast(Any, self._stream).stop()
+                _ = cast(Any, self._stream.stop())
+                self._stream = None
             except Exception as e:
                 logger.debug("Error stopping SoundDevice stream: %s", e)
 
@@ -965,8 +968,8 @@ class SoundDeviceOutputStream(AudioOutputStream):
                 dtype=self.dtype,
                 device=self.device_index,
             )
-            # pyright: ignore[reportExplicitAny]
-            _ = cast(Any, self._stream).start()
+
+            self._stream.start()
             self._active = True
             return True
 

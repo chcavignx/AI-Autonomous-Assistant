@@ -30,7 +30,7 @@ def run() -> None:
         if pathlib.Path(cache_model_path).exists():
             continue
         # os.rename(model_path, cache_model_path)
-        os.symlink(model_path, cache_model_path)
+        pathlib.Path(cache_model_path).symlink_to(model_path)
 
 
 if __name__ == "__main__":
