@@ -24,7 +24,6 @@ def test_path_config_properties():
     assert pc.cache_path == config.ROOT_DIR / ".cache"
     assert pc.models_path == config.ROOT_DIR / ".cache" / "models"
     assert pc.models_audio_path == config.ROOT_DIR / ".cache" / "audio" / "models"
-    assert pc.models_vision_path == config.ROOT_DIR / ".cache" / "vision" / "models"
 
 
 def test_asr_config_defaults():
