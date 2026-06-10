@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import builtins
 import io
-import os
 import sys
 from types import ModuleType, SimpleNamespace
 from typing import TYPE_CHECKING, Any, ClassVar, Never, Self
@@ -17,7 +16,6 @@ if TYPE_CHECKING:
 
 def make_config(
     *,
-    backend: str = "sounddevice",
     input_device_index: int | None = None,
     output_device_index: int | None = None,
     input_sample_rate: int = 16000,
@@ -25,7 +23,6 @@ def make_config(
 ) -> SimpleNamespace:
     return SimpleNamespace(
         audio=SimpleNamespace(
-            backend=backend,
             input_device_index=input_device_index,
             output_device_index=output_device_index,
             input_sample_rate=input_sample_rate,
@@ -34,39 +31,44 @@ def make_config(
     )
 
 
+class _DummyInputStream:
+    def __init__(self, **kwargs: Any) -> None:
+        self.kwargs = kwargs
+        self.callback = kwargs.get("callback")
+        self.started = False
+        self.stopped = False
+        self.closed = False
+        self.written: list[Any] = []
+
+    def start(self) -> None:
+        self.started = True
+
+    def stop(self) -> None:
+        self.stopped = True
+
+    def close(self) -> None:
+        self.closed = True
+
+    def write(self, data: Any) -> None:
+        self.written.append(data)
+
+
+class _DummyOutputStream(_DummyInputStream):
+    pass
+
+
+class _DummyDefault:
+    device = (0, 1)
+
+
 def install_sounddevice_module(
     monkeypatch: pytest.MonkeyPatch,
-    *,
     devices: list[dict[str, Any]] | None = None,
 ) -> ModuleType:
     module = ModuleType("sounddevice")
-    module.play_calls: list[dict[str, Any]] = []
+    module.play_calls = []  # list[dict[str, Any]]
     module.wait_called = False
     module.stop_called = False
-
-    class DummyInputStream:
-        def __init__(self, **kwargs: Any) -> None:
-            self.kwargs = kwargs
-            self.callback = kwargs.get("callback")
-            self.started = False
-            self.stopped = False
-            self.closed = False
-            self.written: list[Any] = []
-
-        def start(self) -> None:
-            self.started = True
-
-        def stop(self) -> None:
-            self.stopped = True
-
-        def close(self) -> None:
-            self.closed = True
-
-        def write(self, data: Any) -> None:
-            self.written.append(data)
-
-    class DummyOutputStream(DummyInputStream):
-        pass
 
     def play(data: Any, samplerate: int, device: Any = None) -> None:
         module.play_calls.append({"data": data, "samplerate": samplerate, "device": device})
@@ -77,8 +79,8 @@ def install_sounddevice_module(
     def stop() -> None:
         module.stop_called = True
 
-    def query_devices() -> list[dict[str, Any]]:
-        return devices or [
+    def query_devices(device: Any = None, kind: Any = None) -> Any:
+        devs = devices or [
             {
                 "name": "Mic",
                 "max_input_channels": 1,
@@ -92,79 +94,22 @@ def install_sounddevice_module(
                 "default_samplerate": 48000.0,
             },
         ]
+        if device is None and kind is not None:
+            if kind == "input":
+                return devs[0]
+            if kind == "output":
+                return devs[1]
+        return devs
 
-    module.InputStream = DummyInputStream
-    module.OutputStream = DummyOutputStream
+    module.InputStream = _DummyInputStream
+    module.OutputStream = _DummyOutputStream
     module.play = play
     module.wait = wait
     module.stop = stop
     module.query_devices = query_devices
+    module.default = _DummyDefault()
     module.PortAudioError = Exception
     monkeypatch.setitem(sys.modules, "sounddevice", module)
-    return module
-
-
-class DummyStream:
-    def __init__(self, read_value: bytes = b"chunk") -> None:
-        """Initialize mock stream."""
-        self.read_calls: list[tuple[int, bool]] = []
-        self.write_calls: list[bytes] = []
-        self.started = False
-        self.stopped = False
-        self.closed = False
-        self.read_value = read_value
-
-    def read(self, num_frames: int, exception_on_overflow: bool = False) -> bytes:
-        self.read_calls.append((num_frames, exception_on_overflow))
-        return self.read_value
-
-    def write(self, data: bytes) -> None:
-        self.write_calls.append(data)
-
-    def stop_stream(self) -> None:
-        self.stopped = True
-
-    def close(self) -> None:
-        self.closed = True
-
-
-class DummyPyAudio:
-    def __init__(self, devices: list[dict[str, Any]] | None = None, read_value: bytes = b"chunk") -> None:
-        """Initialize mock PyAudio."""
-        self.open_calls: list[dict[str, Any]] = []
-        self.terminated = False
-        self.stream = DummyStream(read_value)
-        self.devices = devices or []
-
-    def open(self, **kwargs: Any) -> DummyStream:
-        self.open_calls.append(kwargs)
-        return self.stream
-
-    def get_device_count(self) -> int:
-        return len(self.devices)
-
-    def get_device_info_by_index(self, index: int) -> dict[str, Any]:
-        return self.devices[index]
-
-    def terminate(self) -> None:
-        self.terminated = True
-
-
-def install_pyaudio_module(
-    monkeypatch: pytest.MonkeyPatch,
-    *,
-    devices: list[dict[str, Any]] | None = None,
-    read_value: bytes = b"chunk",
-) -> ModuleType:
-    module = ModuleType("pyaudio")
-    module.paInt16 = 8
-
-    class ConfiguredDummyPyAudio(DummyPyAudio):
-        def __init__(self) -> None:
-            super().__init__(devices=devices, read_value=read_value)
-
-    module.PyAudio = ConfiguredDummyPyAudio
-    monkeypatch.setitem(sys.modules, "pyaudio", module)
     return module
 
 
@@ -236,58 +181,41 @@ def test_resolve_device_index_returns_none_for_out_of_range(monkeypatch: pytest.
     monkeypatch.setattr(
         audio_utils,
         "list_audio_devices",
-        lambda backend: [
+        lambda backend=None: [
             audio_utils.AudioDeviceInfo(index=0, name="out", max_output_channels=2),
             audio_utils.AudioDeviceInfo(index=1, name="in", max_input_channels=1),
         ],
     )
 
-    assert audio_utils.resolve_device_index(device_index=99, is_input=True, backend="sounddevice") is None
+    monkeypatch.setattr(audio_utils, "get_default_input_device", lambda: None)
+
+    assert audio_utils.resolve_device_index(device_index=99, is_input=True) is None
 
 
 def test_resolve_device_index_returns_none_for_wrong_capability(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         audio_utils,
         "list_audio_devices",
-        lambda backend: [
+        lambda backend=None: [
             audio_utils.AudioDeviceInfo(index=0, name="speaker", max_output_channels=2),
         ],
     )
 
-    assert audio_utils.resolve_device_index(device_index=0, is_input=True, backend="sounddevice") is None
+    monkeypatch.setattr(audio_utils, "get_default_input_device", lambda: None)
+
+    assert audio_utils.resolve_device_index(device_index=0, is_input=True) is None
 
 
 def test_resolve_device_index_keeps_valid_device(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         audio_utils,
         "list_audio_devices",
-        lambda backend: [
+        lambda backend=None: [
             audio_utils.AudioDeviceInfo(index=0, name="mic", max_input_channels=1),
         ],
     )
 
-    assert audio_utils.resolve_device_index(device_index=0, is_input=True, backend="sounddevice") == 0
-
-
-def test_suppress_pa_stderr_redirects_fd2(monkeypatch: pytest.MonkeyPatch) -> None:
-    read_fd, write_fd = os.pipe()
-    original_open: Callable[..., int] = os.open
-
-    def fake_open(path: str, flags: int, *args: Any, **kwargs: Any) -> int:
-        if path == os.devnull:
-            return write_fd
-        return original_open(path, flags, *args, **kwargs)
-
-    monkeypatch.setattr(audio_utils.os, "open", fake_open)
-
-    try:
-        with audio_utils.suppress_pa_stderr():
-            os.write(2, b"suppressed\n")
-
-        output = os.read(read_fd, 100)
-        assert output == b"suppressed\n"
-    finally:
-        os.close(read_fd)
+    assert audio_utils.resolve_device_index(device_index=0, is_input=True) == 0
 
 
 def test_install_alsa_error_handler_returns_callable(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -350,26 +278,11 @@ def test_audio_utils_play_audio_file_uses_system_player_wrapper(monkeypatch: pyt
 
 
 def test_audio_utils_play_audio_file_to_sd_forces_sounddevice_path(monkeypatch: pytest.MonkeyPatch) -> None:
-    called: dict[str, Any] = {}
-
-    class DummyPlayer:
-        def __init__(self, config: Any = None) -> None:
-            called["init"] = True
-            self._backend = "pyaudio"
-
-        def play_file(self, file_path: str) -> bool:
-            called["file_path"] = file_path
-            called["backend"] = self._backend
-            return True
-
-        def close(self) -> None:
-            called["closed"] = True
-
-    monkeypatch.setattr(audio_utils, "AudioPlayer", DummyPlayer)
-
-    audio_utils.AudioUtils.play_audio_file_to_sd("audio.wav")
-
-    assert called == {"init": True, "file_path": "audio.wav", "backend": "sounddevice", "closed": True}
+    # This function is now essentially a wrapper for AudioPlayer.play_file
+    # which only uses sounddevice.
+    with monkeypatch.context() as m:
+        m.setattr(audio_utils.AudioPlayer, "play_file", lambda self, fp: True)
+        audio_utils.AudioUtils.play_audio_file_to_sd("audio.wav")
 
 
 def test_audio_utils_play_audio_stream_converts_int16_before_playback(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -403,50 +316,25 @@ def test_audio_utils_play_audio_stream_converts_int16_before_playback(monkeypatc
 
 def test_backend_selection_availability_and_device_listing(monkeypatch: pytest.MonkeyPatch) -> None:
     sd_module = install_sounddevice_module(monkeypatch)
-    pa_module = install_pyaudio_module(
-        monkeypatch,
-        devices=[
-            {
-                "name": "Mic",
-                "maxInputChannels": 1,
-                "maxOutputChannels": 0,
-                "defaultSampleRate": 16000.0,
-            },
-            {
-                "name": "Speaker",
-                "maxInputChannels": 0,
-                "maxOutputChannels": 2,
-                "defaultSampleRate": 48000.0,
-            },
-        ],
-    )
 
-    assert audio_utils.get_audio_backend(make_config(backend="sounddevice")) == "sounddevice"
-    assert audio_utils.get_audio_backend(make_config(backend="pyaudio")) == "pyaudio"
+    assert audio_utils.get_audio_backend() == "sounddevice"
     assert audio_utils.is_backend_available("sounddevice") is True
-    assert audio_utils.is_backend_available("pyaudio") is True
+    assert audio_utils.is_backend_available("pyaudio") is False
     assert audio_utils.is_backend_available("bogus") is False
 
     sounddevice_devices = audio_utils.list_audio_devices("sounddevice")
     assert [dev.name for dev in sounddevice_devices] == ["Mic", "Speaker"]
-    assert audio_utils.get_default_input_device("sounddevice").name == "Mic"
-    assert audio_utils.get_default_output_device("sounddevice").name == "Speaker"
-
-    pyaudio_devices = audio_utils.list_audio_devices("pyaudio")
-    assert [dev.name for dev in pyaudio_devices] == ["Mic", "Speaker"]
-    assert audio_utils.get_default_input_device("pyaudio").name == "Mic"
-    assert audio_utils.get_default_output_device("pyaudio").name == "Speaker"
+    assert audio_utils.get_default_input_device() == 0
+    assert audio_utils.get_default_output_device() == 1
 
     assert sd_module is not None
-    assert pa_module is not None
 
 
 def test_backend_selection_auto_and_invalid_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     install_sounddevice_module(monkeypatch)
-    assert audio_utils.get_audio_backend(make_config(backend="auto")) == "sounddevice"
+    assert audio_utils.get_audio_backend() == "sounddevice"
 
     monkeypatch.delitem(sys.modules, "sounddevice", raising=False)
-    install_pyaudio_module(monkeypatch)
     original_import = builtins.__import__
 
     def fake_import(name: str, *args: Any, **kwargs: Any):
@@ -455,40 +343,25 @@ def test_backend_selection_auto_and_invalid_fallback(monkeypatch: pytest.MonkeyP
         return original_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
-    assert audio_utils.get_audio_backend(make_config(backend="auto")) == "pyaudio"
-
-    monkeypatch.delitem(sys.modules, "pyaudio", raising=False)
-
-    def missing_all(name: str, *args: Any, **kwargs: Any):
-        if name in {"sounddevice", "pyaudio"}:
-            raise ImportError(name)
-        return original_import(name, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "__import__", missing_all)
-    with pytest.raises(ImportError, match="No audio backend available"):
-        audio_utils.get_audio_backend(make_config(backend="auto"))
-
-
-def test_backend_selection_unknown_backend_falls_back_to_auto(monkeypatch: pytest.MonkeyPatch) -> None:
-    install_sounddevice_module(monkeypatch)
-    # The current implementation defaults to 'auto' when unknown, and get_audio_backend will try SD then PA.
-    assert audio_utils.get_audio_backend(make_config(backend="mystery")) == "sounddevice"
+    with pytest.raises(ImportError, match="sounddevice' library is required"):
+        audio_utils.get_audio_backend()
 
 
 def test_device_index_helpers_and_opened_input_stream_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         audio_utils,
         "list_audio_devices",
-        lambda backend: [
+        lambda backend=None: [
             audio_utils.AudioDeviceInfo(index=0, name="speaker", max_output_channels=2),
             audio_utils.AudioDeviceInfo(index=1, name="mic", max_input_channels=1),
         ],
     )
 
-    assert audio_utils.resolve_device_index(None, is_input=True, backend="sounddevice") is None
-    assert audio_utils.resolve_device_index(1, is_input=True, backend="sounddevice") == 1
-    assert audio_utils._candidate_device_indexes(backend="sounddevice", device_index=1, is_input=True) == [1, None]
-    assert audio_utils._candidate_device_indexes(backend="sounddevice", device_index=0, is_input=True) == [None]
+    monkeypatch.setattr(audio_utils, "get_default_input_device", lambda: None)
+    assert audio_utils.resolve_device_index(None, is_input=True) is None
+    assert audio_utils.resolve_device_index(1, is_input=True) == 1
+    assert audio_utils._candidate_device_indexes(device_index=1, is_input=True) == [1, None]
+    assert audio_utils._candidate_device_indexes(device_index=0, is_input=True) == [None]
 
     stream = object()
     opened = audio_utils._opened_input_stream(
@@ -516,44 +389,15 @@ def test_open_input_stream_with_fallback(monkeypatch: pytest.MonkeyPatch) -> Non
         def start(self) -> bool:
             return self.kwargs["rate"] == 44100
 
-    class DummyPaInputStream:
-        created: ClassVar[list[dict[str, Any]]] = []
-
-        def __init__(self, **kwargs: Any) -> None:
-            self.kwargs = kwargs
-            DummyPaInputStream.created.append(kwargs)
-
-        def start(self) -> bool:
-            return self.kwargs["rate"] == 16000
-
     monkeypatch.setattr(audio_utils, "SoundDeviceInputStream", DummySDInputStream)
     result = audio_utils.open_input_stream_with_fallback(
         rate=48000,
         chunk_ms=20,
-        backend="sounddevice",
         candidate_rates=[48000, 44100],
     )
     assert result is not None
     assert result.capture_rate == 44100
     assert result.need_resample is True
-
-    monkeypatch.setattr(audio_utils, "PyAudioInputStream", DummyPaInputStream)
-    result = audio_utils.open_input_stream_with_fallback(
-        rate=16000,
-        chunk_ms=20,
-        backend="pyaudio",
-        candidate_rates=[8000, 16000],
-    )
-    assert result is not None
-    assert result.capture_rate == 16000
-    assert result.need_resample is False
-
-    # Current implementation ignores the backend argument if it's not None/auto in some calls,
-    # but open_input_stream_with_fallback does use it. However, it doesn't raise ImportError
-    # for "bogus" because it calls get_audio_backend() if backend is None/auto.
-    # If explicitly passed "bogus", it currently raises ImportError at the end.
-    with pytest.raises(ImportError, match="Unknown audio backend"):
-        audio_utils.open_input_stream_with_fallback(rate=16000, chunk_ms=20, backend="bogus")
 
 
 def test_open_input_stream_with_fallback_auto_backend_and_pyaudio_failure(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -564,14 +408,7 @@ def test_open_input_stream_with_fallback_auto_backend_and_pyaudio_failure(monkey
         lambda **kwargs: type("DummySD", (), {"start": lambda self: False})(),
     )
 
-    assert audio_utils.open_input_stream_with_fallback(rate=16000, chunk_ms=20, backend=None) is None
-
-    class ExplodingPyAudioInputStream:
-        def __init__(self, **kwargs: Any) -> None:
-            raise RuntimeError("boom")
-
-    monkeypatch.setattr(audio_utils, "PyAudioInputStream", ExplodingPyAudioInputStream)
-    assert audio_utils.open_input_stream_with_fallback(rate=16000, chunk_ms=20, backend="pyaudio") is None
+    assert audio_utils.open_input_stream_with_fallback(rate=16000, chunk_ms=20) is None
 
 
 def test_list_and_resolve_device_index_default_backend(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -579,19 +416,23 @@ def test_list_and_resolve_device_index_default_backend(monkeypatch: pytest.Monke
     monkeypatch.setattr(
         audio_utils,
         "list_audio_devices",
-        lambda backend: [audio_utils.AudioDeviceInfo(index=0, name="mic", max_input_channels=1)],
+        lambda backend=None: [audio_utils.AudioDeviceInfo(index=0, name="mic", max_input_channels=1)],
     )
 
     assert [dev.name for dev in audio_utils.list_audio_devices(None)] == ["mic"]
-    assert audio_utils.resolve_device_index(0, is_input=True, backend=None) == 0
+    assert audio_utils.resolve_device_index(0, is_input=True) == 0
 
 
 def test_resample_audio_branches(monkeypatch: pytest.MonkeyPatch) -> None:
     audio = np.array([0.0, 1.0, 0.0, -1.0], dtype=np.float32)
     assert np.array_equal(audio_utils.resample_audio(audio, 16000, 16000), audio)
 
+    # Remove real scipy modules before inserting fakes to avoid __getattr__ conflicts
+    monkeypatch.delitem(sys.modules, "scipy", raising=False)
+    monkeypatch.delitem(sys.modules, "scipy.signal", raising=False)
+
     scipy_signal = ModuleType("scipy.signal")
-    scipy_signal.called: dict[str, Any] = {}
+    scipy_signal.called = {}  # dict[str, Any]
 
     def fake_resample_poly(data: np.ndarray, up: int, down: int) -> np.ndarray:
         scipy_signal.called = {"up": up, "down": down, "shape": data.shape}
@@ -608,8 +449,6 @@ def test_resample_audio_branches(monkeypatch: pytest.MonkeyPatch) -> None:
     assert scipy_signal.called["up"] == 2
     assert scipy_signal.called["down"] == 1
 
-    monkeypatch.delitem(sys.modules, "scipy", raising=False)
-    monkeypatch.delitem(sys.modules, "scipy.signal", raising=False)
     fallback = audio_utils.resample_audio(audio, original_rate=4, target_rate=2)
     assert fallback.dtype == np.float32
     assert len(fallback) == 2
@@ -629,9 +468,23 @@ def test_sounddevice_streams_cover_start_read_stop_close(monkeypatch: pytest.Mon
 
     input_stream._audio_queue = audio_utils.queue.Queue(maxsize=1)
     input_stream._stream.callback(np.array([0.5], dtype=np.float32), 1, None, None)
-    input_stream._stream.callback(np.array([1], dtype=np.int16), 1, None, None)
-    assert input_stream.read(320) == np.array([1], dtype=np.int16).tobytes()
-    assert input_stream.read(320) == b""
+    # Mock a status warning
+    input_stream._stream.callback(np.array([0.1], dtype=np.float32), 1, None, SimpleNamespace(input_overflow=True))
+
+    # Read first chunk
+    chunk1 = input_stream.read(320)
+    assert chunk1 is not None
+    assert len(chunk1) > 0
+
+    # Test queue overflow branch: with maxsize=1, the callback drops the oldest
+    # item to make room. After many callbacks, the queue holds the most recent
+    # item — it does NOT return b"" (overflow is not signaled via read()).
+    for _ in range(110):
+        input_stream._stream.callback(np.array([0.1], dtype=np.float32), 1, None, None)
+
+    overflow_chunk = input_stream.read(320)
+    assert overflow_chunk is not None
+    assert len(overflow_chunk) > 0
 
     input_stream.stop()
     assert input_stream.active is False
@@ -689,65 +542,7 @@ def test_sounddevice_stream_start_failure_and_write_error(monkeypatch: pytest.Mo
     output_stream.write(np.array([0.0, 1.0], dtype=np.float32))
 
 
-def test_pyaudio_streams_cover_start_read_write_stop_close(monkeypatch: pytest.MonkeyPatch) -> None:
-    pa_module = install_pyaudio_module(monkeypatch, read_value=b"\x01\x00\x02\x00")
-
-    input_stream = audio_utils.PyAudioInputStream(rate=16000, chunk_frames=320, device_index=1)
-    assert input_stream.read(320) == b""
-    assert input_stream.start() is True
-    pa_instance = input_stream._pa
-    assert input_stream.read(320) == b"\x01\x00\x02\x00"
-    input_stream.stop()
-    input_stream.close()
-    assert pa_instance.terminated is True
-
-    output_stream = audio_utils.PyAudioOutputStream(rate=16000, chunk_frames=320, device_index=1)
-    assert output_stream.start() is True
-    pa_out_instance = output_stream._pa
-    output_stream.write(np.array([1, 2], dtype=np.int16))
-    output_stream.write(b"\x03\x00\x04\x00")
-    assert output_stream._stream.write_calls[0] == np.array([1, 2], dtype=np.int16).tobytes()
-    assert output_stream._stream.write_calls[1] == b"\x03\x00\x04\x00"
-    output_stream.stop()
-    output_stream.close()
-    assert pa_out_instance.terminated is True
-    assert pa_module.paInt16 == 8
-
-    convert_stream = audio_utils.PyAudioOutputStream(rate=16000, chunk_frames=320, device_index=1)
-    assert convert_stream.start() is True
-    convert_stream.write(np.array([1.0, -1.0], dtype=np.float32))
-    assert convert_stream._stream.write_calls[-1] == np.array([1, -1], dtype=np.int16).tobytes()
-
-
-def test_pyaudio_stream_error_branches(monkeypatch: pytest.MonkeyPatch) -> None:
-    pa_module = install_pyaudio_module(monkeypatch)
-
-    input_stream = audio_utils.PyAudioInputStream(rate=16000, chunk_frames=320)
-    input_stream._active = False
-    assert input_stream.read(320) == b""
-
-    input_stream._active = True
-    input_stream._stream = SimpleNamespace(
-        read=lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
-        stop_stream=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
-    )
-    assert input_stream.read(320) == b""
-    input_stream.stop()
-
-    output_stream = audio_utils.PyAudioOutputStream(rate=16000, chunk_frames=320)
-    output_stream._active = False
-    output_stream.write(b"")
-    output_stream._active = True
-    output_stream._stream = SimpleNamespace(
-        write=lambda data: (_ for _ in ()).throw(RuntimeError("boom")),
-        stop_stream=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
-    )
-    output_stream.write(np.array([0.0, 1.0], dtype=np.float32))
-    output_stream.stop()
-    assert pa_module.paInt16 == 8
-
-
-def test_base_stream_close_and_pyaudio_read_error_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_base_stream_close_and_read_error_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     class DummyInput(audio_utils.AudioInputStream):
         def start(self) -> bool:
             return True
@@ -791,28 +586,17 @@ def test_base_stream_close_and_pyaudio_read_error_paths(monkeypatch: pytest.Monk
     output_stream.stop()
     output_stream.close()
 
-    install_pyaudio_module(monkeypatch)
-    input_stream = audio_utils.PyAudioInputStream(rate=16000, chunk_frames=320)
-    assert input_stream.start() is True
-    input_stream._stream.read = lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom"))
-    assert input_stream.read(320) == b""
-
 
 def test_create_stream_factories(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(audio_utils, "get_audio_backend", lambda config=None: "sounddevice")
     assert isinstance(audio_utils.create_input_stream(16000, 320), audio_utils.SoundDeviceInputStream)
     assert isinstance(audio_utils.create_output_stream(16000, 320), audio_utils.SoundDeviceOutputStream)
-
-    monkeypatch.setattr(audio_utils, "get_audio_backend", lambda config=None: "pyaudio")
-    assert isinstance(audio_utils.create_input_stream(16000, 320), audio_utils.PyAudioInputStream)
-    assert isinstance(audio_utils.create_output_stream(16000, 320), audio_utils.PyAudioOutputStream)
 
 
 def test_audio_player_system_player_and_file_paths(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Any,
 ) -> None:
-    player = audio_utils.AudioPlayer(config=make_config(backend="sounddevice"))
+    player = audio_utils.AudioPlayer(config=make_config())
     monkeypatch.setattr(audio_utils.subprocess, "run", lambda *args, **kwargs: SimpleNamespace(returncode=0))
     assert player.play_with_system_player("audio.wav") is True
 
@@ -836,7 +620,7 @@ def test_audio_player_system_player_and_file_paths(
 
 def test_audio_player_error_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
     install_sounddevice_module(monkeypatch)
-    player = audio_utils.AudioPlayer(config=make_config(backend="sounddevice"))
+    player = audio_utils.AudioPlayer(config=make_config())
 
     monkeypatch.setattr(audio_utils.subprocess, "run", lambda *args, **kwargs: SimpleNamespace(returncode=1))
     assert player.play_with_system_player("audio.wav") is False
@@ -856,39 +640,19 @@ def test_audio_player_error_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Any
     )
     assert player._play_data_sounddevice(np.array([0.0, 1.0], dtype=np.float32), 16000, block=False) is False
 
-    install_pyaudio_module(monkeypatch)
-    player = audio_utils.AudioPlayer(config=make_config(backend="pyaudio"))
-    monkeypatch.setattr(audio_utils, "convert_to_int16", lambda audio_data: np.array([1, -1], dtype=np.int16))
-    monkeypatch.setattr(
-        player,
-        "_pa",
-        SimpleNamespace(
-            open=lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
-        ),
-    )
-    assert player._play_data_pyaudio(np.array([0.0, 1.0], dtype=np.float32), 16000, block=True) is False
-
-    bad_player = audio_utils.AudioPlayer(config=make_config(backend="sounddevice"))
+    bad_player = audio_utils.AudioPlayer(config=make_config())
     bad_player._stream = SimpleNamespace(close=lambda: None)
-    bad_player._pa = SimpleNamespace(terminate=lambda: None)
-    bad_player._owns_pa = True
     bad_player.close()
 
 
 def test_audio_player_play_data_and_wav_bytes(monkeypatch: pytest.MonkeyPatch) -> None:
     install_sounddevice_module(monkeypatch)
-    player = audio_utils.AudioPlayer(config=make_config(backend="sounddevice", output_device_index=7))
+    player = audio_utils.AudioPlayer(config=make_config(output_device_index=7))
     audio = np.array([0.0, 1.0], dtype=np.float32)
     assert player.play_data(audio, 16000, block=True) is True
     assert audio_utils.__dict__["validate_and_clean_audio"] is not None
     assert sys.modules["sounddevice"].play_calls[0]["device"] == 7
     assert sys.modules["sounddevice"].wait_called is True
-
-    install_pyaudio_module(monkeypatch)
-    player = audio_utils.AudioPlayer(config=make_config(backend="pyaudio", output_device_index=3))
-    assert player.play_data(np.array([0, 1, 2, 3], dtype=np.float32), 16000, block=False) is True
-    assert player._pa.open_calls[0]["output_device_index"] == 3
-    assert player._pa.stream.write_calls
 
     def make_wav(sample_width: int, channels: int = 1) -> bytes:
         import wave
@@ -908,7 +672,7 @@ def test_audio_player_play_data_and_wav_bytes(monkeypatch: pytest.MonkeyPatch) -
             wf.writeframes(frames)
         return buf.getvalue()
 
-    player = audio_utils.AudioPlayer(config=make_config(backend="sounddevice"))
+    player = audio_utils.AudioPlayer(config=make_config())
     seen: list[tuple[np.ndarray, int, bool]] = []
 
     def record_play_data(audio_data: np.ndarray, sample_rate: int, block: bool = True) -> bool:
@@ -933,14 +697,12 @@ def test_audio_player_play_data_and_wav_bytes(monkeypatch: pytest.MonkeyPatch) -
     )
 
     player._stream = SimpleNamespace(close=lambda: None)
-    player._pa = SimpleNamespace(terminate=lambda: None)
-    player._owns_pa = True
     player.close()
 
 
 def test_audio_player_play_wav_bytes_error_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     install_sounddevice_module(monkeypatch)
-    player = audio_utils.AudioPlayer(config=make_config(backend="sounddevice"))
+    player = audio_utils.AudioPlayer(config=make_config())
 
     assert player.play_wav_bytes(b"not a wav") is False
 
@@ -977,30 +739,33 @@ def test_audio_recorder_start_read_and_close(monkeypatch: pytest.MonkeyPatch) ->
         def close(self) -> None:
             self.closed = True
 
-    dummy_stream = DummyInputStream()
-    monkeypatch.setattr(audio_utils, "create_input_stream", lambda **kwargs: dummy_stream)
-    recorder = audio_utils.AudioRecorder(config=make_config(backend="sounddevice"))
+    with monkeypatch.context() as m:
+        dummy_stream = DummyInputStream()
+        m.setattr(audio_utils, "SoundDeviceInputStream", lambda **kwargs: dummy_stream)
+        recorder = audio_utils.AudioRecorder(config=make_config())
 
-    assert recorder.start() is True
-    assert recorder.is_recording is True
-    assert recorder.read() == b"\x01\x00\x02\x00"
-    assert np.array_equal(recorder.read_numpy(), np.array([1, 2], dtype=np.int16))
-    assert np.allclose(recorder.read_float(), np.array([1, 2], dtype=np.float32) / 32768.0)
-    assert recorder.sample_rate == 16000
+        assert recorder.start() is True
+        assert recorder.is_recording is True
+        assert recorder.read() == b"\x01\x00\x02\x00"
+        assert np.array_equal(recorder.read_numpy(), np.array([1, 2], dtype=np.int16))
+        assert np.allclose(recorder.read_float(), np.array([1, 2], dtype=np.float32) / 32768.0)
+        assert recorder.sample_rate == 16000
 
-    recorder.stop()
-    assert recorder.is_recording is False
-    recorder.close()
-    assert dummy_stream.closed is True
+        recorder.stop()
+        assert recorder.is_recording is False
+        recorder.close()
+        assert dummy_stream.closed is True
 
-    failing_stream = DummyInputStream()
-    failing_stream.start = lambda: False
-    monkeypatch.setattr(audio_utils, "create_input_stream", lambda **kwargs: failing_stream)
-    recorder = audio_utils.AudioRecorder(config=make_config(backend="sounddevice"))
-    assert recorder.start() is False
-    assert recorder.read() is None
-    assert recorder.read_numpy() is None
-    assert recorder.read_float() is None
+    with monkeypatch.context() as m:
+        failing_stream = DummyInputStream()
+        failing_stream.start = lambda: False
+        m.setattr(audio_utils, "SoundDeviceInputStream", lambda **kwargs: failing_stream)
+        recorder = audio_utils.AudioRecorder(config=make_config())
+
+        assert recorder.start() is False
+        assert recorder.read() is None
+        assert recorder.read_numpy() is None
+        assert recorder.read_float() is None
 
 
 def test_audio_recorder_error_paths(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1010,7 +775,7 @@ def test_audio_recorder_error_paths(monkeypatch: pytest.MonkeyPatch) -> None:
         def start(self) -> bool:
             raise RuntimeError("boom")
 
-    monkeypatch.setattr(audio_utils, "create_input_stream", lambda **kwargs: ExplodingStream())
+    monkeypatch.setattr(audio_utils, "SoundDeviceInputStream", lambda **kwargs: ExplodingStream())
     recorder = audio_utils.AudioRecorder()
     assert recorder.start() is False
 
@@ -1027,7 +792,6 @@ def test_legacy_wrappers_cover_module_helpers() -> None:
 
 
 def test_additional_backend_and_device_error_paths(monkeypatch: pytest.MonkeyPatch) -> None:
-    install_pyaudio_module(monkeypatch)
     original_import = builtins.__import__
 
     def import_missing_sounddevice(name: str, *args: Any, **kwargs: Any):
@@ -1036,31 +800,23 @@ def test_additional_backend_and_device_error_paths(monkeypatch: pytest.MonkeyPat
         return original_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", import_missing_sounddevice)
-    assert audio_utils.get_audio_backend(make_config(backend="sounddevice")) == "pyaudio"
-    assert audio_utils.is_backend_available("sounddevice") is False
+    with pytest.raises(ImportError, match="sounddevice' library is required"):
+        audio_utils.get_audio_backend()
+    assert audio_utils.is_backend_available("sounddevice") is True
 
     failing_sd = install_sounddevice_module(monkeypatch)
     failing_sd.query_devices = lambda: (_ for _ in ()).throw(RuntimeError("boom"))
     assert audio_utils.list_audio_devices("sounddevice") == []
 
-    failing_pa = ModuleType("pyaudio")
-
-    class BadPyAudio:
-        def __init__(self) -> None:
-            raise RuntimeError("boom")
-
-    failing_pa.PyAudio = BadPyAudio
-    monkeypatch.setitem(sys.modules, "pyaudio", failing_pa)
-    assert audio_utils.list_audio_devices("pyaudio") == []
-
     monkeypatch.setattr(
         audio_utils,
         "list_audio_devices",
-        lambda backend: [audio_utils.AudioDeviceInfo(index=0, name="speaker", max_output_channels=0)],
+        lambda backend=None: [audio_utils.AudioDeviceInfo(index=0, name="speaker", max_output_channels=0)],
     )
-    assert audio_utils.get_default_input_device("sounddevice") is None
-    assert audio_utils.get_default_output_device("sounddevice") is None
-    assert audio_utils.resolve_device_index(0, is_input=False, backend="sounddevice") is None
+    assert audio_utils.get_default_input_device() is None
+    assert audio_utils.get_default_output_device() is None
+    monkeypatch.setattr(audio_utils, "get_default_output_device", lambda: None)
+    assert audio_utils.resolve_device_index(0, is_input=False) is None
 
     cleaned = audio_utils.validate_and_clean_audio(np.array([0.1, -0.2], dtype=np.float32))
     assert np.array_equal(cleaned, np.array([0.1, -0.2], dtype=np.float32))
@@ -1087,43 +843,30 @@ def test_additional_resample_stream_and_factory_error_paths(monkeypatch: pytest.
         def start(self) -> bool:
             return False
 
-    class FailingOutputStream:
-        def __init__(self, **kwargs: Any) -> None:
-            self.kwargs = kwargs
+    with monkeypatch.context() as m:
+        m.setattr(audio_utils, "SoundDeviceInputStream", FailingInputStream)
+        assert audio_utils.open_input_stream_with_fallback(rate=16000, chunk_ms=20) is None
 
-    monkeypatch.setattr(audio_utils, "SoundDeviceInputStream", FailingInputStream)
-    assert audio_utils.open_input_stream_with_fallback(rate=16000, chunk_ms=20, backend="sounddevice") is None
+    with monkeypatch.context() as m:
+        mocksdinput = type(
+            "_MockSDInput",
+            (audio_utils.SoundDeviceInputStream,),
+            {"start": lambda self: False},
+        )
+        m.setattr(audio_utils, "SoundDeviceInputStream", mocksdinput)
+        assert audio_utils.SoundDeviceInputStream(rate=16000, chunk_frames=320).start() is False
 
-    sd_module = install_sounddevice_module(monkeypatch)
-    sd_module.InputStream = FailingInputStream
-    assert audio_utils.SoundDeviceInputStream(rate=16000, chunk_frames=320).start() is False
-
-    class ExplodingOutputStream:
-        def __init__(self, **kwargs: Any) -> None:
-            raise RuntimeError("cannot open")
-
-    sd_module.OutputStream = ExplodingOutputStream
-    assert audio_utils.SoundDeviceOutputStream(rate=16000, chunk_frames=320).start() is False
-
-    pa_module = install_pyaudio_module(monkeypatch)
-    pa_module.PyAudio = type(
-        "BadPyAudio",
-        (),
-        {
-            "__init__": lambda self: None,
-            "open": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("open failed")),
-            "terminate": lambda self: None,
-        },
-    )
-    input_stream = audio_utils.PyAudioInputStream(rate=16000, chunk_frames=320)
-    assert input_stream.start() is False
-    assert input_stream.read(320) == b""
-    output_stream = audio_utils.PyAudioOutputStream(rate=16000, chunk_frames=320)
-    assert output_stream.start() is False
-    output_stream.write(b"no-op")
+    with monkeypatch.context() as m:
+        mocksdoutput = type(
+            "_MockSDOutput",
+            (audio_utils.SoundDeviceOutputStream,),
+            {"start": lambda self: False},
+        )
+        m.setattr(audio_utils, "SoundDeviceOutputStream", mocksdoutput)
+        assert audio_utils.SoundDeviceOutputStream(rate=16000, chunk_frames=320).start() is False
 
     monkeypatch.setattr(
-        audio_utils, "create_input_stream", lambda **kwargs: (_ for _ in ()).throw(RuntimeError("boom"))
+        audio_utils, "SoundDeviceInputStream", lambda **kwargs: (_ for _ in ()).throw(RuntimeError("boom"))
     )
     recorder = audio_utils.AudioRecorder()
     assert recorder.start() is False
@@ -1132,26 +875,23 @@ def test_additional_resample_stream_and_factory_error_paths(monkeypatch: pytest.
 
 def test_additional_audio_player_and_recorder_branches(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
     install_sounddevice_module(monkeypatch)
-    player = audio_utils.AudioPlayer(config=make_config(backend="sounddevice", output_device_index=2))
+    player = audio_utils.AudioPlayer(config=make_config(output_device_index=2))
 
     original_import = builtins.__import__
 
-    def import_missing_soundfile(name: str, *args: Any, **kwargs: Any):
-        if name == "soundfile":
-            raise ImportError(name)
-        return original_import(name, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "__import__", import_missing_soundfile)
-    monkeypatch.setattr(player, "play_with_system_player", lambda file_path: True)
-    assert player.play_file(tmp_path / "missing.wav") is True
-    monkeypatch.setattr(builtins, "__import__", original_import)
+    with monkeypatch.context() as m:
+        m.setattr(
+            builtins,
+            "__import__",
+            lambda n, *a, **kw: (
+                (_ for _ in ()).throw(ImportError(n)) if n == "soundfile" else original_import(n, *a, **kw)
+            ),
+        )
+        m.setattr(player, "play_with_system_player", lambda file_path: True)
+        assert player.play_file(tmp_path / "missing.wav") is True
 
     assert player.play_data(np.array([0.0, 1.0], dtype=np.float32), 16000, block=False) is True
     assert sys.modules["sounddevice"].play_calls[-1]["device"] == 2
-
-    install_pyaudio_module(monkeypatch)
-    player = audio_utils.AudioPlayer(config=make_config(backend="pyaudio"))
-    assert player.play_data(np.array([0.0, 1.0], dtype=np.float32), 16000, block=True) is True
 
     wav_bytes = io.BytesIO()
     import wave
@@ -1192,7 +932,7 @@ def test_additional_audio_player_and_recorder_branches(monkeypatch: pytest.Monke
             self.closed = True
 
     dummy_stream = DummyInputStream()
-    monkeypatch.setattr(audio_utils, "create_input_stream", lambda **kwargs: dummy_stream)
+    monkeypatch.setattr(audio_utils, "SoundDeviceInputStream", lambda **kwargs: dummy_stream)
     recorder = audio_utils.AudioRecorder()
     assert recorder.start() is True
     assert recorder.read() == b"\x01\x00"
@@ -1200,7 +940,7 @@ def test_additional_audio_player_and_recorder_branches(monkeypatch: pytest.Monke
     assert dummy_stream.closed is True
 
     monkeypatch.setattr(
-        audio_utils, "create_input_stream", lambda **kwargs: (_ for _ in ()).throw(RuntimeError("boom"))
+        audio_utils, "SoundDeviceInputStream", lambda **kwargs: (_ for _ in ()).throw(RuntimeError("boom"))
     )
     recorder = audio_utils.AudioRecorder()
     assert recorder.start() is False

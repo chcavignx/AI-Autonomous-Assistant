@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import builtins
 import queue
-import subprocess
 import sys
 from types import SimpleNamespace
 from typing import Any, Literal
@@ -100,10 +99,10 @@ def test_asr_load_whisper(monkeypatch) -> None:
 
     loaded = {}
 
-    def mock_load_model(name: str, device=None, download_root=None) -> Literal["mock_model"]:
-        loaded["name"] = name
-        loaded["device"] = device
-        loaded["download_root"] = download_root
+    def mock_load_model(*args, **kwargs) -> Literal["mock_model"]:
+        loaded.update(kwargs)
+        if args:
+            loaded["name"] = args[0]
         return "mock_model"
 
     mock_whisper = MagicMock()
@@ -111,8 +110,8 @@ def test_asr_load_whisper(monkeypatch) -> None:
     monkeypatch.setitem(sys.modules, "whisper", mock_whisper)
 
     asr._load_whisper()
-    assert loaded["name"] == config.asr.model_size
-    assert loaded["device"] == config.asr.device
+    assert loaded.get("name") == config.asr.model_size or loaded.get("model_size") == config.asr.model_size
+    assert loaded.get("device") == config.asr.device
     assert asr._stt_model == "mock_model"
 
 
@@ -123,14 +122,10 @@ def test_asr_load_faster_whisper(monkeypatch) -> None:
 
     loaded: dict[Any, Any] = {}
 
-    def mock_WhisperModel(
-        model_size_or_path: str, device=None, compute_type=None, cpu_threads=0, num_workers=1
-    ) -> Literal["mock_model"]:
-        loaded["model_size_or_path"] = model_size_or_path
-        loaded["device"] = device
-        loaded["compute_type"] = compute_type
-        loaded["cpu_threads"] = cpu_threads
-        loaded["num_workers"] = num_workers
+    def mock_WhisperModel(*args, **kwargs) -> Literal["mock_model"]:
+        loaded.update(kwargs)
+        if args:
+            loaded["model_size_or_path"] = args[0]
         return "mock_model"
 
     mock_faster_whisper = MagicMock()
@@ -138,8 +133,9 @@ def test_asr_load_faster_whisper(monkeypatch) -> None:
     monkeypatch.setitem(sys.modules, "faster_whisper", mock_faster_whisper)
 
     asr._load_faster_whisper()
-    assert loaded["model_size_or_path"] == config.asr.model_size
-    assert loaded["device"] == config.asr.device
+    target_key = "model_size_or_path" if "model_size_or_path" in loaded else "model_size"
+    assert loaded.get(target_key) == config.asr.model_size
+    assert loaded.get("device") == config.asr.device
     assert asr._stt_model == "mock_model"
 
 
@@ -151,7 +147,12 @@ def test_asr_load_vad_model(monkeypatch) -> None:
     config: Config = Config()
     asr: ASREngine = ASREngine(config)
 
-    def mock_load_silero_vad() -> Literal["mock_vad"]:
+    loaded: dict[Any, Any] = {}
+
+    def mock_load_silero_vad(*args, **kwargs) -> Literal["mock_vad"]:
+        loaded.update(kwargs)
+        if args:
+            loaded["onnx_used"] = args[0]
         return "mock_vad"
 
     monkeypatch.setattr("silero_vad.load_silero_vad", mock_load_silero_vad)
@@ -168,7 +169,7 @@ def test_asr_load_vad_model_fallback(monkeypatch) -> None:
     config: Config = Config()
     asr: ASREngine = ASREngine(config)
 
-    def mock_load_silero_vad() -> None:
+    def mock_load_silero_vad(*args, **kwargs) -> None:
         raise ImportError("No silero")
 
     monkeypatch.setattr("silero_vad.load_silero_vad", mock_load_silero_vad)
@@ -177,7 +178,7 @@ def test_asr_load_vad_model_fallback(monkeypatch) -> None:
     assert asr._vad_model is None
 
 
-def test_asr_detect_speech_with_vad(monkeypatch):
+def test_asr_detect_speech_with_vad(monkeypatch: pytest.MonkeyPatch) -> None:
     config: Config = Config()
     asr: ASREngine = ASREngine(config)
 
@@ -202,7 +203,7 @@ def test_asr_detect_speech_fallback_energy() -> None:
     assert asr._detect_speech(chunk)
 
     # Quiet chunk
-    chunk: bytes = b"\x00\x00" * 6000
+    chunk = b"\x00\x00" * 6000
     assert not asr._detect_speech(chunk)
 
 
@@ -236,23 +237,8 @@ def test_asr_transcribe_faster_whisper(monkeypatch) -> None:
     assert result == "hello world"
 
 
-def test_tts_find_piper_binary(monkeypatch) -> None:
-    config: Config = Config()
-    config.tts.cli_mode = True
-    tts: TTSEngine = TTSEngine(config)
-
-    def mock_exists(path) -> bool:
-        return str(path).endswith("piper")
-
-    monkeypatch.setattr("pathlib.Path.exists", mock_exists)
-
-    tts._find_piper_binary()
-    assert tts._piper_bin is not None
-
-
 def test_tts_load_piper_python(monkeypatch) -> None:
     config: Config = Config()
-    config.tts.cli_mode = False
     tts: TTSEngine = TTSEngine(config)
 
     loaded: dict[Any, Any] = {}
@@ -272,9 +258,8 @@ def test_tts_load_piper_python(monkeypatch) -> None:
     assert tts._piper_voice == "mock_voice"
 
 
-def test_tts_synthesize_via_api(monkeypatch):
+def test_tts_synthesize_via_api(monkeypatch: pytest.MonkeyPatch) -> None:
     config: Config = Config()
-    config.tts.cli_mode = False
     tts: TTSEngine = TTSEngine(config)
 
     synthesized = {}
@@ -292,37 +277,12 @@ def test_tts_synthesize_via_api(monkeypatch):
     mock_voice.synthesize_wav = mock_synthesize_wav
     tts._piper_voice = mock_voice
 
-    result: bytes | None = tts._synthesize_via_api("hello")
+    result: bytes | None = tts._synthesize("hello")
 
     assert synthesized["text"] == "hello"
     assert synthesized["set_wav_format"] is True
     assert result is not None
     assert result.endswith(b"dummy")
-
-
-def test_tts_synthesize_via_cli(monkeypatch) -> None:
-    config = Config()
-    config.tts.cli_mode = True
-    tts: TTSEngine = TTSEngine(config)
-    tts._piper_bin = "mock_piper"
-
-    run_calls: list[Any] = []
-
-    def mock_run(cmd, **kwargs) -> MagicMock:
-        run_calls.append(cmd)
-        mock_result: MagicMock = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = b"\x00\x00"
-        mock_result.stderr = b""
-        return mock_result
-
-    monkeypatch.setattr("subprocess.run", mock_run)
-
-    result: bytes | None = tts._synthesize_via_cli(text="hello")
-    assert "mock_piper" in run_calls[0]
-    assert "--model" in run_calls[0]
-    assert isinstance(result, bytes)
-    assert result.startswith(b"RIFF")
 
 
 def test_tts_playback_loop_processes_queue(monkeypatch) -> None:
@@ -496,9 +456,8 @@ def test_asr_stop_clears_queue(monkeypatch) -> None:
     engine: ASREngine = ASREngine(config)
     engine._running = True
 
-    # Mock the stream mock threads and pa
+    # Mock the stream
     engine._stream = MagicMock()
-    engine._pa = MagicMock()
 
     # Mock threads that won't actually join
     mock_thread: MagicMock = MagicMock()
@@ -518,28 +477,6 @@ def test_asr_stop_clears_queue(monkeypatch) -> None:
     assert engine._running is False
 
 
-def test_tts_load_initializes_thread(monkeypatch) -> None:
-    config: Config = Config()
-    config.tts.cli_mode = True
-
-    engine: TTSEngine = TTSEngine(config)
-
-    # Mock _find_piper_binary to avoid filesystem lookups
-    monkeypatch.setattr("src.audio.tts.TTSEngine._find_piper_binary", lambda _self: None)
-
-    # Mock pyaudio
-    mock_pa_instance = MagicMock()
-    monkeypatch.setattr("pyaudio.PyAudio", lambda: mock_pa_instance)
-
-    # Mock thread start to avoid blocking
-    monkeypatch.setattr("threading.Thread.start", lambda self: None)
-
-    engine.load()
-
-    assert engine._running is True
-    assert engine._playback_thread is not None
-
-
 def test_tts_unload_stops_thread(monkeypatch) -> None:
     config: Config = Config()
     engine: TTSEngine = TTSEngine(config)
@@ -547,7 +484,6 @@ def test_tts_unload_stops_thread(monkeypatch) -> None:
 
     # Mock thread
     engine._playback_thread = MagicMock()
-    engine._pa = MagicMock()
 
     engine.unload()
 
@@ -587,45 +523,12 @@ def test_tts_pcm_to_wav_conversion() -> None:
     assert len(wav_bytes) > len(pcm_bytes)
 
 
-def test_tts_synthesize_via_cli_timeout(monkeypatch) -> None:
-    config: Config = Config()
-    config.tts.cli_mode = True
-    engine: TTSEngine = TTSEngine(config)
-    engine._piper_bin = "/mock/piper"
-
-    # Mock subprocess.run to raise timeout
-    def mock_run(*args, **kwargs):
-        raise subprocess.TimeoutExpired(cmd="piper", timeout=15)
-
-    monkeypatch.setattr("subprocess.run", mock_run)
-
-    result: bytes | None = engine._synthesize_via_cli(text="hello")
-    assert result is None
-
-
-def test_tts_synthesize_via_cli_error(monkeypatch) -> None:
-    config: Config = Config()
-    config.tts.cli_mode = True
-    engine: TTSEngine = TTSEngine(config)
-    engine._piper_bin = "/mock/piper"
-
-    # Mock subprocess.run to return error
-    mock_result: MagicMock = MagicMock()
-    mock_result.returncode = 1
-    mock_result.stderr = b"Error: model not found"
-
-    monkeypatch.setattr("subprocess.run", lambda *_a, **_k: mock_result)
-
-    result: bytes | None = engine._synthesize_via_cli(text="hello")
-    assert result is None
-
-
 def test_tts_synthesize_via_api_no_voice(monkeypatch) -> None:
     config: Config = Config()
     engine: TTSEngine = TTSEngine(config)
     engine._piper_voice = None
 
-    result: bytes | None = engine._synthesize_via_api(text="hello")
+    result: bytes | None = engine._synthesize(text="hello")
     assert result is None
 
 
@@ -638,7 +541,7 @@ def test_tts_synthesize_via_api_error(monkeypatch) -> None:
     mock_voice.synthesize_wav.side_effect = Exception("Synthesis error")
     engine._piper_voice = mock_voice
 
-    result: bytes | None = engine._synthesize_via_api(text="hello")
+    result: bytes | None = engine._synthesize(text="hello")
     assert result is None
 
 
@@ -649,7 +552,7 @@ def test_asr_energy_based_vad_high_amplitude() -> None:
     assert result
 
 
-def test_asr_energy_based_vad_low_amplitude():
+def test_asr_energy_based_vad_low_amplitude() -> None:
     # Test VAD with quiet audio
     quiet_chunk: bytes = b"\x10\x00" * 6000  # Very quiet
     result: bool = ASREngine._energy_based_vad(chunk=quiet_chunk)
@@ -778,7 +681,6 @@ def test_tts_unload_clears_piper_voice() -> None:
             return False
 
     engine._playback_thread = DummyThread()
-    engine._pa = MagicMock()
 
     engine.unload()
 
@@ -842,37 +744,6 @@ def test_asr_unload_with_skip_config_flag(monkeypatch) -> None:
     assert engine._vad_model is not None
 
 
-def test_tts_find_piper_binary_missing_raises(monkeypatch) -> None:
-    """Test TTS CLI setup fails when no Piper binary exists."""
-    config: Config = Config()
-    config.tts.cli_mode = True
-    engine: TTSEngine = TTSEngine(config)
-
-    monkeypatch.setattr("pathlib.Path.exists", lambda self: False)
-
-    with pytest.raises(FileNotFoundError, match="Piper binary not found"):
-        engine._find_piper_binary()
-
-
-def test_tts_synthesize_with_cli_mode(monkeypatch) -> None:
-    """Test TTS synthesis in CLI mode with successful execution."""
-    config: Config = Config()
-    config.tts.cli_mode = True
-    engine: TTSEngine = TTSEngine(config)
-    engine._piper_bin = "/usr/bin/piper"
-
-    # Mock successful subprocess execution
-    mock_result: MagicMock = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = b"\x00\x00"  # Minimal WAV header
-
-    monkeypatch.setattr("subprocess.run", lambda *_a, **_k: mock_result)
-
-    result: bytes | None = engine._synthesize_via_cli(text="hello world")
-    assert result is not None
-    assert result.startswith(b"RIFF")  # WAV files start with RIFF header
-
-
 def test_tts_playback_loop_with_multiple_items(monkeypatch) -> None:
     """Test TTS playback loop processes multiple queue items."""
     config: Config = Config()
@@ -880,13 +751,6 @@ def test_tts_playback_loop_with_multiple_items(monkeypatch) -> None:
     engine._running = True
 
     synthesized_items: list[str] = []
-
-    def mock_synthesize(self, text) -> bytes:
-        synthesized_items.append(text)
-        return b"wav_data"
-
-    def mock_play_wav(self, data) -> None:
-        pass  # Just acknowledge playback
 
     monkeypatch.setattr(
         "src.audio.tts.TTSEngine._synthesize", lambda _self, text: (synthesized_items.append(text), b"wav_data")[1]
@@ -1023,9 +887,6 @@ def test_wake_word_current_branches(monkeypatch, tmp_path) -> None:
     )
     detector.load()
     assert detector._model is not None
-
-    class MissingStream:
-        pass
 
     monkeypatch.setattr(
         "src.audio.wake_word.open_input_stream_with_fallback",
