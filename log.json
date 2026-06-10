@@ -1,0 +1,47 @@
+
+{
+    "version": 1,
+    "disable_existing_loggers": false,
+    "formatters": {
+        "simple": {
+            "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S"
+        }
+    },
+    "filters": {
+        "max_warning": {
+            "()": "src.utils.log_filters.MaxLevelFilter",
+            "max_level": "WARNING"
+        }
+    },
+    "handlers": {
+        "stdout": {
+            "class": "logging.StreamHandler",
+            "level": "INFO",
+            "filters": ["max_warning"],
+            "formatter": "simple",
+            "stream": "ext://sys.stdout"
+        },
+        "stderr": {
+            "class": "logging.StreamHandler",
+            "level": "ERROR",
+            "formatter": "simple",
+            "stream": "ext://sys.stderr"
+        },
+        "file": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "formatter": "simple",
+            "filename": ".tmp/ai-assistant.log",
+            "when": "midnight",
+            "backupCount": 7
+        }
+    },
+    "root": {
+        "level": "DEBUG",
+        "handlers": [
+            "stderr",
+            "stdout",
+            "file"
+        ]
+    }
+}
