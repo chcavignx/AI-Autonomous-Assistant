@@ -1,6 +1,5 @@
-"""audio/wake_word.py.
-==================
-Wake word detection using openWakeWord.
+# audio/wake_word.py
+"""Wake word detection using openWakeWord.
 
 Lightweight (~10MB), fast (<5ms/chunk), fully offline.
 Runs in background with configurable cooldown to prevent false positives.
@@ -36,7 +35,9 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from src.utils.config import Config
 
-logger = logging.getLogger(__name__)
+module_name = __name__
+lib_name = module_name.split('.')[1]
+logger = logging.getLogger(lib_name)
 
 
 class _WakeWordModelLike(Protocol):
@@ -195,8 +196,7 @@ class WakeWordDetector:
 
         logger.info("Waiting for wake word: '%s'", self._config.wake.wake_word)
         logger.info(
-            "Wake word detector listening with %s backend...",
-            self._backend or "auto",
+            "Wake word detector listening with sounddevice backend...",
         )
 
     def stop(self) -> None:
@@ -243,8 +243,6 @@ class WakeWordDetector:
                 rate=16000,
                 chunk_ms=self._config.audio.input_chunk_ms,
                 device_index=self._config.audio.input_device_index,
-                backend=self._config.audio.backend,
-                config=self._config,
                 candidate_rates=[44100, 48000, 16000, 22050, 8000],
                 dtype="float32",
             )

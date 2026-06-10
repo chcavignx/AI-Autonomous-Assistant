@@ -4,7 +4,7 @@ Text-to-Speech engine using Piper TTS.
 
 Supports:
   - CLI subprocess (piper binary) — stable on ARM
-  - Python API (PiperVoice) — streaming playback via sounddevice
+  - Python API (PiperVoice) — streaming playback via sounddevice only
 
 Non-blocking queue-based threading for responsive conversational flow.
 """
@@ -15,8 +15,8 @@ import io
 import logging
 import os
 import queue
-import subprocess
 import sys
+
 import threading
 import wave
 from pathlib import Path
@@ -25,17 +25,12 @@ from typing import BinaryIO, Protocol, cast
 # Ensure 'src' is in sys.path
 sys.path.insert(0, str(Path(os.path.join(Path(__file__).parent, "..")).resolve()))
 
-from src.audio.audio_utils import AudioPlayer, get_audio_backend
+from src.audio.audio_utils import AudioPlayer
 from src.utils.config import Config
 
-logger = logging.getLogger(__name__)
-
-_PIPER_BINARY_CANDIDATES = [
-    Path.home() / ".local" / "bin" / "piper",
-    Path("/usr/local/bin/piper"),
-    Path("/usr/bin/piper"),
-]
-
+module_name = __name__
+lib_name = module_name.split('.')[1]
+logger = logging.getLogger(lib_name)
 
 class _PiperVoiceLike(Protocol):
     def synthesize_wav(
@@ -58,7 +53,6 @@ class TTSEngine:
     """
 
     _config: Config
-    _piper_bin: Path | None
     _engine: str
     _model_name: str
     _model_path: Path
@@ -76,7 +70,6 @@ class TTSEngine:
         """
         super().__init__()
         self._config = config
-        self._piper_bin = None
         self._engine = self._config.tts.engine
         self._model_name = self._config.tts.model_name
         self._model_path = self._config.tts.full_model_path
@@ -93,11 +86,7 @@ class TTSEngine:
 
     def load(self) -> None:
         """Initialize TTS engine."""
-        if not self._config.tts.cli_mode:
-            self._load_piper_python()
-        else:
-            self._find_piper_binary()
-
+        self._load_piper_python()
         self._running = True
         self._playback_thread = threading.Thread(
             target=self._playback_loop, daemon=False, name="tts-playback"
@@ -105,10 +94,8 @@ class TTSEngine:
         self._playback_thread.start()
 
         logger.info(
-            "TTS ready (model=%s, use_cli=%s, backend=%s)",
+            "TTS ready (model=%s, backend=sounddevice)",
             self._config.tts.model_name,
-            self._config.tts.cli_mode,
-            get_audio_backend(self._config),
         )
 
     def unload(self) -> None:
@@ -119,23 +106,10 @@ class TTSEngine:
             self._playback_thread.join(timeout=3.0)
             if self._playback_thread.is_alive():
                 logger.warning("TTS playback thread did not terminate in time")
-                return  # Don't terminate PyAudio while thread may still use it
+                return  # Don't close resources while thread may still use them
         self._audio_player.close()
         self._piper_voice = None
         logger.info("TTS stopped")
-
-    def _find_piper_binary(self) -> None:
-        """Locate piper binary for CLI mode."""
-        if self._config.tts.cli_mode:
-            # Note: binary_path is not in TTSConfig, check if needed for CLI mode
-            for candidate in _PIPER_BINARY_CANDIDATES:
-                if candidate.exists():
-                    self._piper_bin = candidate
-                    logger.info("Piper binary: %s", candidate)
-                    return
-
-            msg = "Piper binary not found. Install piper via: https://github.com/rhasspy/piper"
-            raise FileNotFoundError(msg)
 
     def _load_piper_python(self) -> None:
         """Load Piper Python API."""
@@ -232,58 +206,6 @@ class TTSEngine:
     # ====================================================================
 
     def _synthesize(self, text: str) -> bytes | None:
-        """Synthesize text to WAV bytes.
-
-        Returns:
-            WAV bytes, or None on error.
-
-        """
-        if self._config.tts.cli_mode:
-            return self._synthesize_via_cli(text)
-        return self._synthesize_via_api(text)
-
-    def _synthesize_via_cli(self, text: str) -> bytes | None:
-        """Piper CLI subprocess → WAV bytes."""
-        if not self._piper_bin:
-            logger.error("Piper binary not found")
-            return None
-
-        model_file = self._config.tts.full_model_path
-
-        # Defensive check for speed to avoid ZeroDivisionError or nonsense values
-        speed = max(self._config.tts.speed, 0.01)
-
-        cmd = [
-            str(self._piper_bin),
-            "--model",
-            str(model_file),
-            "--output_raw",
-            "--length_scale",
-            str(1.0 / speed),
-        ]
-
-        try:
-            result = subprocess.run(
-                cmd,
-                input=text.encode("utf-8"),
-                capture_output=True,
-                timeout=15.0,
-            )
-            if result.returncode != 0:
-                logger.error("Piper error: %s", result.stderr.decode())
-                return None
-
-            # Piper --output_raw → PCM s16le 22050Hz mono
-            return self._pcm_to_wav(result.stdout, sample_rate=22050)
-
-        except subprocess.TimeoutExpired:
-            logger.exception("Piper synthesis timeout")
-            return None
-        except Exception as e:
-            logger.exception("Piper subprocess error: %s", e)
-            return None
-
-    def _synthesize_via_api(self, text: str) -> bytes | None:
         """Piper Python API → WAV bytes."""
         if not self._piper_voice:
             logger.error("Piper voice not initialized")

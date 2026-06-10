@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import logging.config
 import sys
 from collections.abc import Mapping
 from pathlib import Path
@@ -65,6 +67,8 @@ class ASRConfig(PathConfig):
     device: str = "cpu"  # Pi5 : CPU (or "hailo")
     compute_type: str = "int8"  # INT8 = 2x plus rapide sur ARM
     skip_native_teardown: bool = False
+    store_audio: bool = False
+    store_audio_path: str | None = None
 
     @property
     def download_path(self) -> Path:
@@ -87,7 +91,7 @@ class TTSConfig(PathConfig):
     """Configuration for TTS (Text-to-Speech) settings."""
 
     engine: str = "piper"
-    model_name: str = "en_US-hfc_female-medium.onnx"
+    model_name: str = "jarvis-medium.onnx"
     model_path: str | None = None
     cli_mode: bool = False
     device: str = "cpu"  # Pi5 : CPU (or "hailo")
@@ -157,30 +161,14 @@ class AudioConfig(PathConfig):
     input_sample_rate: int = 22050
     input_chunk_ms: int = 30  # taille des chunks audio en ms
     input_chunk_size: int = 500
-    input_device_index: int | None = None  # None = périphérique système par défaut
+    input_device_index: int | None = None  # None = default input device
+    input_device_name: str | None = None  # Optional name of input device to select (overrides index if found)
     volume: float = 0.5  # half as loud
-    output_device_index: int | None = None  # None = périphérique système par défaut
+    output_device_index: int | None = None  # None = default output device
     output_sample_rate: int = 22050
     output_chunk_ms: int = 30  # taille des chunks audio en ms
     output_chunk_size: int = 500
     output_device_name: str | None = None  # Optional name of output device to select (overrides index if found)
-    backend: str = (
-        "auto"  # Audio backend: "pyaudio", "sounddevice", or "auto" (try sounddevice first, fallback to pyaudio)
-    )
-
-
-class CameraConfig(BaseModel):
-    """Configuration for camera settings."""
-
-    camera_index: int = 0
-    frame_width: int = 640
-    frame_height: int = 480
-
-
-class VisionConfig(PathConfig):
-    """Configuration for vision settings."""
-
-    camera: CameraConfig = Field(default_factory=CameraConfig)
 
 
 class PlatformConfig(PathConfig):
@@ -211,8 +199,8 @@ class PlatformConfig(PathConfig):
 
     def __post_init__(self) -> None:
         """Apply platform-specific tuning after initialization."""
-        self.is_raspberry_pi()
-        self.cpu_limit()
+        _ = self.is_raspberry_pi()
+        _ = self.cpu_limit()
 
 
 class Config:
@@ -224,7 +212,6 @@ class Config:
     wake: WakeConfig
     vad: VADConfig
     audio: AudioConfig
-    vision: VisionConfig
     platform: PlatformConfig
 
     def __init__(self, **data: object) -> None:
@@ -236,7 +223,6 @@ class Config:
         self.wake = WakeConfig.model_validate(data.get("wake", {}))
         self.vad = VADConfig.model_validate(data.get("vad", {}))
         self.audio = AudioConfig.model_validate(data.get("audio", {}))
-        self.vision = VisionConfig.model_validate(data.get("vision", {}))
         self.platform = PlatformConfig.model_validate(data.get("platform", {}))
 
     @staticmethod
@@ -356,3 +342,14 @@ def setup_python_path() -> None:
     root_str = str(ROOT_DIR)
     if root_str not in sys.path:
         sys.path.insert(0, root_str)
+
+
+def setup_config_logging() -> None:
+    """Set up the logging configuration module."""
+    log_file = ROOT_DIR / "log.json"
+    with Path(log_file).open("r", encoding="utf-8") as f:
+        logging.config.dictConfig(json.load(f))  # pyright: ignore[reportAny]
+
+
+setup_python_path()
+setup_config_logging()

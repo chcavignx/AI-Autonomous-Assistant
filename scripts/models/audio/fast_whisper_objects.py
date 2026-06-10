@@ -33,7 +33,7 @@ MODELS_NAMES_EXTENDED = (
     "Systran/faster-distil-whisper-large-v3",
 )
 
-CACHE_DIR = str(config.asr.download_path)
+CACHE_DIR = str(config.asr.download_path())
 
 
 def get_models_to_download() -> tuple:

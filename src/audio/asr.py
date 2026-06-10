@@ -12,7 +12,7 @@ Architecture:
   4. On silence detected -> STT (Whisper/Faster-Whisper) -> transcript
   5. Callback on result
 
-All offline, no cloud calls. Multiple backend support (PyAudio or sounddevice).
+All offline, no cloud calls. Exclusive backend support for sounddevice.
 """
 
 from __future__ import annotations
@@ -41,8 +41,11 @@ from src.audio.audio_utils import AudioInputStream, open_input_stream_with_fallb
 from src.utils.config import Config
 from src.utils.sysutils import limit_cpu_for_multiprocessing, detect_raspberry_pi_model
 
-logger = logging.getLogger(__name__)
+module_name = __name__
+lib_name = module_name.split('.')[1]
+logger = logging.getLogger(lib_name)
 
+USE_ONNX = True
 
 class _ResamplePoly(Protocol):
     def __call__(
@@ -129,6 +132,10 @@ class ASREngine:
         self._resample_up: int = 1
         self._resample_down: int = 1
 
+        # WAV writer — opened in start(), written by _process_thread, closed in stop()
+        self._wav_writer: wave.Wave_write | None = None
+        self._wav_writer_lock: threading.Lock = threading.Lock()
+
     # ====================================================================
     # Lifecycle
     # ====================================================================
@@ -139,10 +146,9 @@ class ASREngine:
         self._load_stt_model()
         self._load_vad_model()
         logger.info(
-            "ASR ready (engine=%s, lang=%s, backend=%s)",
+            "ASR ready (engine=%s, lang=%s, backend=sounddevice)",
             self._config.asr.engine,
             self._config.asr.language,
-            self._config.audio.backend,
         )
 
     def unload(self) -> None:
@@ -215,7 +221,7 @@ class ASREngine:
             return
         try:
             if self._stt_model is None:
-                logger.info("Loading Faster-Whisper %s...", self._config.asr.model_size)
+                logger.info("Loading Faster-Whisper %s, from dir: %s", self._config.asr.model_size, self._config.asr.download_path)
                 self._stt_model = cast(
                     _FasterWhisperModelLike,
                     cast(
@@ -224,6 +230,7 @@ class ASREngine:
                             model_size_or_path=self._config.asr.model_size,
                             device=self._config.asr.device,
                             compute_type=self._config.asr.compute_type,
+                            download_root=str(self._config.asr.download_path),
                             cpu_threads=1,
                             num_workers=1,
                         ),
@@ -253,7 +260,7 @@ class ASREngine:
         try:
             from silero_vad import load_silero_vad
 
-            self._vad_model = cast(_VadModelLike, load_silero_vad())
+            self._vad_model = cast(_VadModelLike, load_silero_vad(onnx=USE_ONNX))
             logger.info("Silero VAD loaded")
         except Exception as e:
             logger.exception(
@@ -281,6 +288,20 @@ class ASREngine:
         if not self._open_input_stream():
             self._running = False
             return
+
+        # Open WAV writer for audio storage
+        if self._config.asr.store_audio and self._config.asr.store_audio_path:
+            store_path = pathlib.Path(self._config.asr.store_audio_path)
+            try:
+                store_path.parent.mkdir(parents=True, exist_ok=True)
+                wf = wave.open(str(store_path), "wb")
+                wf.setnchannels(1)
+                wf.setsampwidth(2)  # int16
+                wf.setframerate(self._config.audio.input_sample_rate)
+                self._wav_writer = wf
+                logger.info("Audio storage initialized: %s", self._config.asr.store_audio_path)
+            except OSError as e:
+                logger.warning("Audio storage disabled — could not open WAV file %s: %s", store_path, e)
 
         self._capture_thread = threading.Thread(
             target=self._capture_loop, daemon=False, name="asr-capture"
@@ -325,10 +346,17 @@ class ASREngine:
                         "ASR process thread did not exit before shutdown completed"
                     )
 
+        # Close WAV writer only after process thread has exited (no more writes)
+        with self._wav_writer_lock:
+            if self._wav_writer is not None:
+                with contextlib.suppress(Exception):
+                    self._wav_writer.close()
+                self._wav_writer = None
+
         logger.info("ASR stopped")
 
     # ====================================================================
-    # Capture thread (PyAudio/sounddevice -> queue)
+    # Capture thread (sounddevice -> queue)
     # ====================================================================
 
     def _open_input_stream(self) -> bool:
@@ -338,8 +366,6 @@ class ASREngine:
                 rate=self._config.audio.input_sample_rate,
                 chunk_ms=self._config.audio.input_chunk_ms,
                 device_index=self._config.audio.input_device_index,
-                backend=self._config.audio.backend,
-                config=self._config,
                 candidate_rates=[
                     self._config.audio.input_sample_rate,
                     44100,
@@ -437,6 +463,9 @@ class ASREngine:
             if chunk is None:  # sentinel
                 break
 
+            # Store all captured audio chunks for validation purposes
+            self._store_audio(chunk)
+
             is_speech = self._detect_speech(chunk)
 
             if is_speech:
@@ -484,6 +513,13 @@ class ASREngine:
         rms = math.sqrt(float(np.mean(audio**2)))
         return rms > 300  # empirical threshold for standard USB mic
 
+    def _store_audio(self, audio_bytes: bytes) -> None:
+        """Write audio bytes as WAV frames to the open wav writer."""
+        with self._wav_writer_lock:
+            if self._wav_writer is not None:
+                self._wav_writer.writeframes(audio_bytes)
+                logger.debug("Audio chunk stored: %s", self._config.asr.store_audio_path)
+
     def _transcribe(self, audio_bytes: bytes) -> None:
         """Transcribe accumulated audio buffer."""
         if self._stt_model is None:
@@ -508,7 +544,7 @@ class ASREngine:
             wf.setsampwidth(2)  # int16
             wf.setframerate(self._config.audio.input_sample_rate)
             _ = wf.writeframes(audio_bytes)
-        wav_buffer.seek(0)
+        _=wav_buffer.seek(0)
 
         if self._config.asr.engine in {"faster-whisper", "faster_whisper"}:
             model = cast(_FasterWhisperModelLike | None, self._stt_model)
@@ -535,6 +571,7 @@ class ASREngine:
                 word_timestamps=True,
                 fp16=False,
             )
+
         return self._extract_text_from_result(result)
 
     def _extract_text_from_result(self, result: object) -> str:
