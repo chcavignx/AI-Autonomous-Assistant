@@ -47,7 +47,6 @@ jobs:
       - name: Install dependencies
         uses: ./.github/actions/python-uv-setup
         with:
-          enable-cache: true
           sync-flags: "--locked --no-default-groups --group test"
       - name: Run core tests
         run: uv run pytest -n auto -m "${{ inputs.marker }}" --cov=src --cov-report=xml tests/

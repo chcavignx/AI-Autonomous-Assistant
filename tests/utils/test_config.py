@@ -11,6 +11,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.resolve()))
 
 from src.utils import config
 
+pytestmark = pytest.mark.basic
+
 
 def test_path_config_defaults() -> None:
     pc = config.PathConfig()

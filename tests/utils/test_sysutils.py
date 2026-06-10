@@ -13,6 +13,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.resolve()))
 
 from src.utils import sysutils
 
+pytestmark = pytest.mark.basic
+
 
 @dataclass
 class DummyVmem:
