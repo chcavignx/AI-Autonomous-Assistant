@@ -6,6 +6,7 @@ and segment/timestamp production using the repository sample audio file
 (data/test.wav) and tests the audio resampling utility.
 """
 
+import logging
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -15,8 +16,6 @@ project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
 import numpy as np
-
-# pyright: ignore[reportMissingImports]
 import soundfile as sf
 from src.audio.audio_utils import resample_audio
 from src.audio.vad import VADEngine
@@ -25,6 +24,8 @@ from src.utils.config import load_config
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
+app_name = 'test_vad_standalone'
+logger = logging.getLogger(app_name)
 
 def test_vad_standalone() -> bool:
 
@@ -96,4 +97,5 @@ def test_vad_standalone() -> bool:
 
 if __name__ == "__main__":
     success = test_vad_standalone()
+    logger.info(f"VAD standalone test {'passed' if success else 'failed'}")
     sys.exit(0 if success else 1)

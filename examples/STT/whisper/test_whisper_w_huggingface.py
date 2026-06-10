@@ -157,7 +157,7 @@ def main() -> None:
             "object",
             pipeline(
                 task="automatic-speech-recognition",
-                model: PreTrainedModel = model,
+                model=model,
                 tokenizer=processor.tokenizer,
                 feature_extractor=processor.feature_extractor,
                 torch_dtype=torch_dtype,
@@ -193,10 +193,7 @@ def main() -> None:
     # Results
     # ----------------------
     if result is not None:
-        pass
-        # print(result)  # Uncomment to display all
-
-    # print(result)  # Uncomment to display all
+        print(result)
 
     # Force cleanup
     _ = gc.collect()

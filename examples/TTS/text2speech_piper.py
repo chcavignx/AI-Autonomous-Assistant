@@ -16,7 +16,7 @@ from piper import PiperVoice, SynthesisConfig
 # Ensure repo root is accessible
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
-from src.audio.audio_utils import create_output_stream, get_audio_backend
+from src.audio.audio_utils import create_output_stream
 from src.utils.config import config
 
 # Paths to the model and config files for French and English voices
@@ -87,22 +87,11 @@ def synthesize_voice_and_save(
 ) -> None:
     """Synthesizes text to audio, saves it and plays."""
     # Create a Piper object
-    voice = cast("_PiperVoiceLike", PiperVoice.load(os.fspath(model_path)))
+    voice = cast("_PiperVoiceLike", cast(object, PiperVoice.load(os.fspath(model_path))))
 
-    with wave.open(os.fspath(output_file), "wb") as wav_file:
-        _ = voice.synthesize_wav(text=text, wav_file=wav_file, set_wav_format=True, syn_config=syn_config)
-
-
-def synthesize_voice(model_path: str | PathLike[str], text: str) -> None:
-    """Synthesizes text to audio and plays it."""
-    # Create a Piper object
-    voice = cast("_PiperVoiceLike", PiperVoice.load(os.fspath(model_path)))
-
-    backend = get_audio_backend()
     stream = create_output_stream(
         rate=voice.config.sample_rate,
         chunk_frames=512,
-        backend=backend
     )
 
     if stream.start():
@@ -123,7 +112,6 @@ def main() -> None:
     text_fr += " J'espère que vous apprécierez cette démonstration."
     file_fr = setup_output_filename(DATA_DIR, TEST_FILE_NAME, model_fr.split("/")[-1].replace(".onnx", ""))
     synthesize_voice_and_save(model_fr, text_fr, file_fr)
-    synthesize_voice(model_fr, text_fr)
     # Example for the English (GB) voice
     model_en = os.path.join(MODEL_DIR, "jarvis-medium.onnx")
     # text_en = "This is a test in British English using the Piper engine."
@@ -132,7 +120,6 @@ def main() -> None:
     text_en += " I hope you will enjoy this demonstration."
     file_en = setup_output_filename(DATA_DIR, TEST_FILE_NAME, model_en.split("/")[-1].replace(".onnx", ""))
     synthesize_voice_and_save(model_en, text_en, file_en)
-    synthesize_voice(model_en, text_en)
 
 
 if __name__ == "__main__":

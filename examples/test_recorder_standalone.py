@@ -8,6 +8,7 @@ Run with:
   python examples/test_recorder_standalone.py
 """
 
+import logging
 import sys
 import time
 from pathlib import Path
@@ -20,6 +21,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.audio.audio_utils import AudioRecorder
 from src.utils.config import load_config
 
+app_name = 'test_recorder_standalonest_recorder_standalone'
+logger = logging.getLogger(app_name)
 
 def test_recorder_lifecycle() -> bool:
 
@@ -86,6 +89,7 @@ def test_recorder_lifecycle() -> bool:
 
 if __name__ == "__main__":
     success = test_recorder_lifecycle()
+    logger.info(f"Recorder lifecycle test {'passed' if success else 'failed'}")
     # Explicit exit to prevent potential ALSA/PortAudio teardown segfaults
     import os
     os._exit(0 if success else 1)

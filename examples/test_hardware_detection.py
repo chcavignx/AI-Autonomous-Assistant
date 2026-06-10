@@ -8,6 +8,8 @@ Run with:
   python examples/test_hardware_detection.py
 """
 
+import logging
+import os
 import sys
 from pathlib import Path
 
@@ -16,6 +18,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.audio.audio_utils import get_audio_backend, list_audio_devices
 
+app_name = 'test_hardware_detection'
+logger = logging.getLogger(app_name)
 
 def test_audio_hardware_available() -> bool | None:
     """Check if any audio hardware (input or output) is available."""
@@ -49,4 +53,5 @@ def test_audio_hardware_available() -> bool | None:
 
 if __name__ == "__main__":
     success = test_audio_hardware_available()
-    sys.exit(0 if success else 1)
+    logger.info(f"Audio hardware detection test {'passed' if success else 'failed'}")
+    os._exit(0 if success else 1)

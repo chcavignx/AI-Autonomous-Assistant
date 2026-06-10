@@ -8,6 +8,8 @@ Run with:
   python examples/test_wake_word_standalone.py
 """
 
+import logging
+import os
 import sys
 import time
 from pathlib import Path
@@ -18,6 +20,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.audio.wake_word import WakeWordDetector
 from src.utils.config import load_config
 
+app_name = 'test_wake_word_standalone'
+logger = logging.getLogger(app_name)
 
 def test_wake_word_standalone() -> bool:
 
@@ -54,6 +58,6 @@ def test_wake_word_standalone() -> bool:
 
 if __name__ == "__main__":
     success = test_wake_word_standalone()
+    logger.info(f"Wake word standalone test {'passed' if success else 'failed'}")
     # Explicit exit to prevent potential ALSA/PortAudio teardown segfaults
-    import os
     os._exit(0 if success else 1)

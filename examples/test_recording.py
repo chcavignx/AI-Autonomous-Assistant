@@ -8,6 +8,7 @@ Run with:
   python examples/test_recording.py
 """
 
+import logging
 import os
 import sys
 import wave
@@ -19,6 +20,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.audio.audio_utils import AudioPlayer, open_input_stream_with_fallback
 from src.utils.config import load_config
 
+app_name = 'test_recordering'
+logger = logging.getLogger(app_name)
 
 def test_simple_recording(duration_s: int = 2, output_file: str | Path | None = None) -> bool:
     """Test recording audio from microphone and saving to WAV."""
@@ -36,7 +39,6 @@ def test_simple_recording(duration_s: int = 2, output_file: str | Path | None = 
         rate=config.audio.input_sample_rate,
         chunk_ms=config.audio.input_chunk_ms,
         device_index=config.audio.input_device_index,
-        config=config,
         dtype="int16"  # Use int16 for direct WAV writing
     )
 
@@ -56,7 +58,7 @@ def test_simple_recording(duration_s: int = 2, output_file: str | Path | None = 
                 frames.append(data)
 
             # Progress indicator
-            (i + 1) % (max(1, chunk_count // 4)) == 0
+            _ = (i + 1) % (max(1, chunk_count // 4)) == 0
 
         # Write to WAV file
         resolved_output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -69,7 +71,7 @@ def test_simple_recording(duration_s: int = 2, output_file: str | Path | None = 
 
         # Verify file size
         file_size = resolved_output_file.stat().st_size
-
+        stream.close()
         return not file_size < 1000
 
     except Exception:
@@ -103,8 +105,10 @@ def test_recording_and_playback() -> bool:
 
 if __name__ == "__main__":
     success1 = test_simple_recording()
+    logger.info(f"Simple Recording test {'passed' if success1 else 'failed'}")
     success2 = test_recording_and_playback()
+    logger.info(f"Recording and playback test {'passed' if success2 else 'failed'}")
 
     all_passed = success1 and success2
-
+    logger.info(f"Overall Recording test {'passed' if all_passed else 'failed'}")
     os._exit(0 if all_passed else 1)

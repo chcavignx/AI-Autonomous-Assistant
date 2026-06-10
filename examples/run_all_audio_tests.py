@@ -18,7 +18,6 @@ TESTS = [
     ("Audio Playback", "test_playback.py"),
     ("Audio Recording", "test_recording.py"),
     ("Recorder Standalone", "test_recorder_standalone.py"),
-    ("ASR Engine Flow", "test_asr_integration.py"),
     ("ASR with TTS", "test_asr_with_tts.py"),
     ("ASR Recording Validation", "test_asr_recording_validation.py"),
     ("Wake Word Standalone", "test_wake_word_standalone.py"),

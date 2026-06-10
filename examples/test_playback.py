@@ -8,6 +8,8 @@ Run with:
   python examples/test_playback.py
 """
 
+import logging
+import os
 import sys
 import time
 from pathlib import Path
@@ -25,6 +27,8 @@ from src.audio.audio_utils import (
 from src.audio.tts import TTSEngine
 from src.utils.config import load_config
 
+app_name = 'test_playback'
+logger = logging.getLogger(app_name)
 
 def generate_sine_wave(
     frequency: int,
@@ -41,7 +45,7 @@ def test_playback_sine_wave() -> bool:
     """Test playback of a generated sine wave."""
     output_dev = get_default_output_device()
     if output_dev is None:
-        return True
+        return False
 
     get_audio_backend()
     sample_rate = 16000
@@ -70,7 +74,7 @@ def test_playback_silence() -> bool:
     """Test playback of silence (zeros)."""
     output_dev = get_default_output_device()
     if output_dev is None:
-        return True
+        return False
 
     get_audio_backend()
     sample_rate = 16000
@@ -97,9 +101,7 @@ def test_playback_tts_wav() -> bool:
     """Test playback of TTS-generated WAV audio."""
     output_dev = get_default_output_device()
     if output_dev is None:
-        return True
-
-    get_audio_backend()
+        return False
 
     # Load config and TTS engine
     config = load_config()
@@ -113,7 +115,6 @@ def test_playback_tts_wav() -> bool:
     # Generate audio from text
     test_text = "Hello, how are you today?"
     try:
-        # pyright: ignore[reportPrivateUsage]
         wav_bytes = tts_engine._synthesize(test_text)
         if wav_bytes is None:
             tts_engine.unload()
@@ -173,6 +174,5 @@ if __name__ == "__main__":
     success4 = test_playback_file()
 
     all_passed = success1 and success2 and success3 and success4
-    status = "PASSED" if all_passed else "FAILED"
-
-    sys.exit(0 if all_passed else 1)
+    logger.info(f"Playback test {'passed' if all_passed else 'failed'}")
+    os._exit(0 if all_passed else 1)

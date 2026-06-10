@@ -2,21 +2,21 @@
 """Integration test: ASREngine Recording Validation.
 
 Uses the production ASREngine to capture audio and validates that the
-captured data is valid PCM by saving it to a temporary WAV file.
+captured data is valid PCM by checking the stored WAV file.
+
+The test does NOT require speech/transcription - it only validates that
+the ASR pipeline captures audio and writes a valid WAV file.
 
 Run with:
   python examples/test_asr_recording_validation.py
 """
 
+import logging
 import os
-import queue
 import sys
 import time
 import wave
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
-
-from typing_extensions import override
 
 # Ensure repo root is accessible
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -24,10 +24,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.audio.asr import ASREngine
 from src.utils.config import load_config
 
-if TYPE_CHECKING:
-    _BaseQueue = queue.Queue[bytes | None]
-else:
-    _BaseQueue = queue.Queue
+app_name = 'test_asr_recording_validation'
+logger = logging.getLogger(app_name)
 
 
 def test_asr_recording() -> bool:
@@ -35,64 +33,95 @@ def test_asr_recording() -> bool:
     # 1. Load configuration
     config = load_config()
 
-    # 2. Initialize Engine
+    # 2. Resolve the store_audio_path - ASREngine writes captured audio here
+    store_path = Path(config.asr.store_audio_path)
+    if not store_path.is_absolute():
+        store_path = Path(__file__).resolve().parent.parent / store_path
+
+    # Remove any stale file from a previous run so we can detect a fresh write
+    if store_path.exists():
+        store_path.unlink()
+
+    # 3. Initialize Engine
     engine = ASREngine(config)
     try:
         engine.load()
     except Exception:
+        logger.exception("Failed to load ASR engine")
         return False
 
-    # 3. Instrument the queue to capture raw audio chunks
-    captured_data: list[bytes] = []
+    # 4. Collect transcripts (bonus validation - not required for pass)
     transcripts: list[str] = []
 
     def on_transcript(text: str) -> None:
         if text:
             transcripts.append(text)
 
-    class CaptureQueue(_BaseQueue):
-        @override
-        def put(self, item: bytes | None, block: bool = True, timeout: float | None = None) -> None:
-            if item is not None:
-                captured_data.append(item)
-            super().put(item, block=block, timeout=timeout)
-
-    # pyright: ignore[reportPrivateUsage]
-    engine._audio_queue = cast("_BaseQueue", CaptureQueue())
-
-    # 4. Run capture
+    # 5. Run capture for a few seconds (silence is fine - we just test the pipeline)
     duration = 3
 
     try:
         engine.start(callback=on_transcript)
+        logger.info('ASR start listening ...')
 
         start_time = time.time()
         while time.time() - start_time < duration:
             time.sleep(0.5)
 
         engine.stop()
+        logger.info('ASR stop listening ...')
 
     except Exception:
         engine.stop()
+        logger.exception('Error during ASR capture')
         return False
 
-    # 5. Validate captured data
-    if not captured_data:
+    # 6. Validate: the ASR engine must have written the WAV file
+    if not store_path.exists():
+        logger.warning(
+            "ASR recording validation failed: store file not found at %s. \
+            Check that config.asr.store_audio=true and store_audio_path is set.",
+            store_path,
+        )
         return False
 
-    # 6. Save to temporary file for verification
-    tmp_file = Path(__file__).parent.parent / ".tmp" / "test_asr_capture.wav"
-    tmp_file.parent.mkdir(exist_ok=True)
+    file_size = store_path.stat().st_size
+    if file_size < 44:  # WAV header alone is 44 bytes
+        logger.warning(
+            "ASR recording validation failed: store file too small (%d bytes)", file_size
+        )
+        return False
 
-    with wave.open(str(tmp_file), "wb") as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2)  # int16
-        wf.setframerate(config.audio.input_sample_rate)
-        wf.writeframes(b"".join(captured_data))
+    # 7. Validate WAV file structure
+    try:
+        with wave.open(str(store_path), "rb") as wf:
+            n_frames = wf.getnframes()
+            rate = wf.getframerate()
+            channels = wf.getnchannels()
+            sampwidth = wf.getsampwidth()
+            logger.info(
+                "WAV validation OK: %d frames @ %d Hz, %d ch, %d bytes/sample",
+                n_frames, rate, channels, sampwidth,
+            )
+            if n_frames == 0:
+                logger.warning("WAV file has 0 frames")
+                return False
+    except wave.Error as e:
+        logger.warning("WAV file is invalid: %s", e)
+        return False
+
+    # 8. Log transcripts if any came through (informational only)
+    if transcripts:
+        logger.info("Bonus: transcripts received: %s", transcripts)
+    else:
+        logger.info(
+            "No transcripts (silence during test) - recording pipeline validation still passed"
+        )
 
     return True
 
 
 if __name__ == "__main__":
     success = test_asr_recording()
+    logger.info(f"ASR recording validation test {'passed' if success else 'failed'}")
     os._exit(0 if success else 1)

@@ -63,7 +63,7 @@ model = cast("_WhisperModelLike", whisper.load_model(model_id, download_root=MOD
 # model = whisper.load_model(MODEL_ID, download_root=download_root, device=device)
 try:
     start_time = time.time()
-    _ = model.transcribe(
+    result = model.transcribe(
         audio_file,
         word_timestamps=True,
         fp16=False,
@@ -71,6 +71,7 @@ try:
         task="translate" if TRANSLATE else "transcribe",
     )
     print_time_usage("After transcription", start_time)
+    print(result["text"])
 except RuntimeError:
     pass
 

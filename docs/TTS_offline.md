@@ -89,8 +89,8 @@ The engine uses the `piper-tts` Python package for the default mode and supports
 Default TTS settings come from `src/utils/config.py`:
 
 - `engine = piper`
-- `model_name = en_US-hfc_female-medium.onnx`
-- `cli_mode = false`
+- `model_name = jarvis-medium.onnx`
+- `model_path = Null`
 - `speed = 1.0`
 - `volume = 0.5`(range 0.0 to 1.0)
 - `output_sample_rate = 22050`(common for TTS models, but can be adjusted based on the model's requirements and playback capabilities)
@@ -109,25 +109,15 @@ The implementation is non-blocking by default, so the assistant can keep listeni
 
 #### Piper Python API
 
-- Used when `cli_mode = false`
 - Requires the `piper-tts` Python package
 - Loads the voice model directly from the configured model path
-
-#### Piper CLI
-
-- Used when `cli_mode = true`
-- Searches for a `piper` binary in common locations:
-  - `~/.local/bin/piper`
-  - `/usr/local/bin/piper`
-  - `/usr/bin/piper`
-- Useful when you prefer the standalone Piper binary
 
 ### Installation
 
 Install the main dependencies used by the current TTS engine:
 
 ```bash
-pip install piper-tts pyaudio
+pip install piper-tts sounddevice
 ```
 
 If you want to use the Piper CLI mode, also install the Piper binary from the official project.
