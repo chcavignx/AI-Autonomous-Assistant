@@ -26,6 +26,7 @@ class PathConfig(BaseModel):
     data: str = "data"
     cache: str = ".cache"
     models: str = "models"
+    tmp: str = ".tmp"
 
     @property
     def src_path(self) -> Path:
@@ -347,6 +348,10 @@ def setup_python_path() -> None:
 def setup_config_logging() -> None:
     """Set up the logging configuration module."""
     log_file = ROOT_DIR / "log.json"
+
+    log_path = Path(config.paths.tmp + "/filename.log")
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
     with Path(log_file).open("r", encoding="utf-8") as f:
         logging.config.dictConfig(json.load(f))  # pyright: ignore[reportAny]
 
