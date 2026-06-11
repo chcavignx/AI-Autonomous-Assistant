@@ -14,6 +14,8 @@ from src.audio.asr import ASREngine
 from src.audio.tts import TTSEngine
 from src.utils.config import Config
 
+pytestmark = pytest.mark.basic
+
 
 def test_tts_speak_truncates_long_text() -> None:
     config: Config = Config()

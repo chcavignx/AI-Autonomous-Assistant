@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 from src.audio.asr import ASREngine
 from src.utils.config import load_config
 
 
+@pytest.mark.basic
 def _chunk_from_int16(values: list[int]) -> bytes:
     return np.array(values, dtype=np.int16).tobytes()
 

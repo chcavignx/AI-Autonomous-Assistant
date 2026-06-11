@@ -11,6 +11,8 @@ import pytest
 from src.audio.wake_word import WakeWordDetector
 from src.utils.config import Config
 
+pytestmark = pytest.mark.basic
+
 
 def test_load_import_error_when_openwakeword_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that load() raises ImportError when openwakeword is not installed."""

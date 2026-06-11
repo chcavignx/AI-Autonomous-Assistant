@@ -1,9 +1,11 @@
 import unittest
 from unittest.mock import MagicMock
 
+import pytest
 from src.audio.audio_utils import get_audio_backend
 
 
+@pytest.mark.basic
 class TestAudioBackends(unittest.TestCase):
     def setUp(self):
         self.config = MagicMock()

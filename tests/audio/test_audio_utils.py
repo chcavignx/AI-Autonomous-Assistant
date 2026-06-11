@@ -10,6 +10,8 @@ import numpy as np
 import pytest
 from src.audio import audio_utils
 
+pytestmark = pytest.mark.basic
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 

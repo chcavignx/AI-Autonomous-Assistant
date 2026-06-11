@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import pytest
 from src.audio.tts import TTSEngine
 from src.utils.config import load_config
+
+pytestmark = pytest.mark.basic
 
 
 def test_speak_enqueues_text_without_loading() -> None:

@@ -3,16 +3,15 @@ from __future__ import annotations
 import sys
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import numpy as np
+import pytest
 from src.audio.vad import VADEngine
 from src.audio.wake_word import WakeWordDetector
 from src.utils.config import Config
 
-if TYPE_CHECKING:
-    import pytest
+pytestmark = pytest.mark.basic
 
 
 def test_vad_is_speech_detected(monkeypatch: pytest.MonkeyPatch) -> None:

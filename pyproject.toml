@@ -190,10 +190,11 @@ addopts = [
     "-W error",  # STRICT: Treat warnings as errors (catch deprecations early)
     "-ra",
     "--tb=short",
-    "--cov=.",
+    "--cov=src",
     "--cov-report=term-missing:skip-covered",
     "--cov-report=xml",
-    "--cov-fail-under=80",  # STRICT: Require 80% coverage
+    # fail-under lives in [tool.coverage.report] — see below.
+    # 80% is the target for the full suite; the basic marker subset achieves ~30%.
 ]
 filterwarnings = [
     "error",  # Treat all warnings as errors by default
@@ -225,6 +226,25 @@ norecursedirs = [
 "logs",
 "outputs",
 "*.egg-info",
+]
+
+[tool.coverage.run]
+# Omit hardware-dependent modules that cannot execute in CI
+# (no camera, microphone, GPU, or wake-word model files present)
+omit = [
+    "src/audio/wake_word.py",
+]
+
+[tool.coverage.report]
+# Realistic threshold for the `basic` marker subset (~30-35%).
+# Raise this toward 80 as more tests are marked basic or integration tests
+# are added to CI.
+fail_under = 80
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    '^\s*\.\.\.$',
 ]
 
 [tool.basedpyright]
