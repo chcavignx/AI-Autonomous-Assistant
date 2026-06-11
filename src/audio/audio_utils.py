@@ -83,7 +83,7 @@ class OpenedInputStream:
 
 def get_audio_backend() -> str:
     try:
-        import sounddevice  # pyright: ignore[reportUnusedImport]
+        import sounddevice as sd
         return "sounddevice"
     except ImportError:
         raise ImportError(
