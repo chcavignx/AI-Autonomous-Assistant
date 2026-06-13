@@ -7,7 +7,7 @@ name = "ai-autonomous-assistant"
 version = "0.1.0"
 description = "AI Autonomous Assistant"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE.txt"]
 keywords = ["AI", "Autonomous", "Assistant","Raspberry PI"]
@@ -40,42 +40,41 @@ classifiers = [
 
 # Dépendances principales (runtime)
 dependencies = [
+    "accelerate>=0.20.3",
     "blobfile",
+    "datasets>=2.14.5",
     "dotenv>=0.9.9",
+    "faster-whisper>=0.1.3",
     "flask-cors>=4.0.0",
     "flask>=2.3.0",
+    "huggingface-hub>=0.18.0",
     "joblib>=1.3.0",
+    "lazy-loader>=0.2.0",
     "librosa>=0.10.0",
     "loguru>=0.7.0",
     "numba>=0.57.0",
     "numpy>=1.24.0",
+    "openai-whisper==20250625",
     "onnxruntime>=1.16.0",
+    "openwakeword>=0.1.0",
+    "piper-tts>=1.4.1",
     "psutil>=7.2.2",
     "pydantic>=2.0.0",
+    "pydub>=0.25.1",
     "python-dotenv",
+    "pyttsx3>=2.90",
     "pyyaml>=6.0",
     "requests>=2.31.0",
-    "typing-extensions>=4.12",
-    "accelerate>=0.20.3",
-    "datasets>=2.14.5",
-    "faster-whisper>=0.1.3",
-    "huggingface-hub>=0.18.0",
-    "openai-whisper>=20230314",
-    "pydub>=0.25.1",
-    "pyttsx3>=2.90",
     "scipy>=1.11.0",
     "silero-vad>=2.0.0",
+    "sounddevice>=0.5.5",
     "soundfile>=0.12.1",
     "tiktoken>=0.4.0",
     "tokenizers>=0.19.0",
-    "transformers>=4.35.0",
     "torch==2.9.1",
     "torchaudio==2.9.1",
-    "lazy-loader>=0.2.0",
-    "piper-tts>=1.4.1",
-    "pyaudio>=0.2.14",
-    "openwakeword>=0.1.0",
-    "sounddevice>=0.5.5",
+    "transformers>=4.35.0",
+    "typing-extensions>=4.12",
 ]
 
 [project.optional-dependencies]
@@ -102,6 +101,7 @@ override-dependencies = [
 environments = [
     "sys_platform == 'darwin' and platform_machine == 'arm64'",
     "sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 
 [dependency-groups]
@@ -121,7 +121,10 @@ lint = [
 test = [
     "pytest>=9.0.2",
     "pytest-cov>=4.1.0",
+    "pytest-mock>=3.10.0",
     "pytest-xdist>=3.0.0",
+    "freezegun>=1.2.2",
+    "factory-boy>=3.2.1",
 ]
 
 [tool.ruff]
@@ -135,6 +138,7 @@ extend-exclude = [
     "src/ai_autonomous_assistant.egg-info/",
     "src/audio/",
     "src/vision/",
+    ".agents/",
 ]
 
 [tool.ruff.lint]
@@ -168,6 +172,7 @@ ignore = [
     "S404",    # subprocess import flagged as insecure - needed for testing
     "BLE001",  # blind exception catches - intentional in error handling tests
     "PLW0108", # unused lambda result - sometimes necessary for mocking
+    "FBT",     # Boolean positional arguments are normal/necessary in mocks/tests
 ]
 
 [tool.ruff.format]
@@ -185,10 +190,11 @@ addopts = [
     "-W error",  # STRICT: Treat warnings as errors (catch deprecations early)
     "-ra",
     "--tb=short",
-    "--cov=.",
+    "--cov=src",
     "--cov-report=term-missing:skip-covered",
     "--cov-report=xml",
-    "--cov-fail-under=80",  # STRICT: Require 80% coverage
+    # fail-under lives in [tool.coverage.report] — see below.
+    # 80% is the target for the full suite; the basic marker subset achieves ~30%.
 ]
 filterwarnings = [
     "error",  # Treat all warnings as errors by default
@@ -222,8 +228,27 @@ norecursedirs = [
 "*.egg-info",
 ]
 
+[tool.coverage.run]
+# Omit hardware-dependent modules that cannot execute in CI
+# (no camera, microphone, GPU, or wake-word model files present)
+omit = [
+    "src/audio/wake_word.py",
+]
+
+[tool.coverage.report]
+# Realistic threshold for the `basic` marker subset (~30-35%).
+# Raise this toward 80 as more tests are marked basic or integration tests
+# are added to CI.
+fail_under = 80
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    '^\s*\.\.\.$',
+]
+
 [tool.basedpyright]
-pythonVersion = "3.10"
+pythonVersion = "3.11"
 venvPath = "."
 useLibraryCodeForTypes = true
 reportMissingTypeStubs = false
@@ -254,6 +279,7 @@ exclude = [
     "*.egg-info",
     "*.egg",
     "src/vision/",
+    ".agents/",
 ]
 
 # ============================================================
@@ -337,3 +363,64 @@ reportDeprecated = "warning"     # Warn on deprecated usage
 # ADDITIONAL TYPE CHECKS
 # ============================================================
 reportImportCycles = "warning"
+
+# ============================================================
+# PER-DIRECTORY OVERRIDES
+# Tests are written without full annotations by design (ruff
+# also skips ANN for tests).  Relax the noisy strict rules
+# that fire on pytest-idiomatic patterns while keeping src/
+# fully strict.
+# ============================================================
+[[tool.basedpyright.executionEnvironments]]
+root = "tests"
+reportUnknownParameterType = false
+reportMissingParameterType = false
+reportUnknownLambdaType = false
+reportUnknownArgumentType = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportPrivateUsage = false
+reportPrivateLocalImportUsage = false
+reportAny = false
+reportExplicitAny = false
+reportUnusedParameter = false
+reportAttributeAccessIssue = false
+reportUnusedCallResult = false
+reportImplicitOverride = false
+reportUnannotatedClassAttribute = false
+reportMissingTypeArgument = false
+reportOptionalMemberAccess = false
+reportCallIssue = false
+reportArgumentType = false
+reportMissingSuperCall = false
+reportUninitializedInstanceVariable = false
+reportUntypedFunctionDecorator = false
+reportUntypedClassDecorator = false
+reportUntypedBaseClass = false
+
+[[tool.basedpyright.executionEnvironments]]
+root = "examples"
+reportUnknownParameterType = false
+reportMissingParameterType = false
+reportUnknownLambdaType = false
+reportUnknownArgumentType = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportPrivateUsage = false
+reportPrivateLocalImportUsage = false
+reportAny = false
+reportExplicitAny = false
+reportUnusedParameter = false
+reportAttributeAccessIssue = false
+reportUnusedCallResult = false
+reportImplicitOverride = false
+reportUnannotatedClassAttribute = false
+reportMissingTypeArgument = false
+reportOptionalMemberAccess = false
+reportCallIssue = false
+reportArgumentType = false
+reportMissingSuperCall = false
+reportUninitializedInstanceVariable = false
+reportUntypedFunctionDecorator = false
+reportUntypedClassDecorator = false
+reportUntypedBaseClass = false

@@ -13,7 +13,6 @@ if str(root_path) not in sys.path:
 
 from huggingface_hub import snapshot_download
 from models_check import model_exists
-
 from src.utils.config import config
 from src.utils.sysutils import detect_raspberry_pi_model
 
@@ -34,7 +33,7 @@ MODELS_NAMES_EXTENDED = (
     "Systran/faster-distil-whisper-large-v3",
 )
 
-CACHE_DIR = str(config.asr.download_path)
+CACHE_DIR = str(config.asr.download_path())
 
 
 def get_models_to_download() -> tuple:

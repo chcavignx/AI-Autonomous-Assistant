@@ -2,196 +2,177 @@
 """Integration test: Simple Audio Playback.
 
 Tests that audio data can be generated (sine wave), sent to output stream,
-and played back through hardware.
+and played back through hardware using the unified audio_utils library.
 
 Run with:
   python examples/test_playback.py
 """
 
+import logging
+import os
 import sys
+import time
 from pathlib import Path
 
 # Ensure repo root is accessible
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
-import pyaudio
-import time
+from numpy.typing import NDArray
+from src.audio.audio_utils import (
+    AudioPlayer,
+    get_audio_backend,
+    get_default_output_device,
+)
+from src.audio.tts import TTSEngine
+from src.utils.config import load_config
 
+app_name = 'test_playback'
+logger = logging.getLogger(app_name)
 
-def find_first_output_device():
-    """Get first available output device index."""
-    pa = pyaudio.PyAudio()
-    try:
-        for idx in range(pa.get_device_count()):
-            info = pa.get_device_info_by_index(idx)
-            max_output = info.get("maxOutputChannels", 0)
-            if max_output and max_output > 0:
-               return idx
-    finally:
-        pa.terminate()
-    return None
-
-
-def generate_sine_wave(frequency: int, duration_s: int, sample_rate: int):
-    """Generate a sine wave at specified frequency.
-
-    Args:
-        frequency: Hz (e.g., 440 for A note)
-        duration_s: Duration in seconds
-        sample_rate: Sample rate in Hz
-
-    Returns:
-        numpy array of float32 samples
-    """
+def generate_sine_wave(
+    frequency: int,
+    duration_s: int,
+    sample_rate: int,
+) -> NDArray[np.float32]:
+    """Generate a sine wave at the given frequency."""
     samples = int(sample_rate * duration_s)
-    t = np.linspace(0, duration_s, samples, False)
-    wave = np.sin(2 * np.pi * frequency * t).astype(np.float32)
-    return wave
+    t = np.linspace(0, duration_s, samples, endpoint=False)
+    return np.sin(2 * np.pi * frequency * t).astype(np.float32)
 
 
-def test_playback_sine_wave():
+def test_playback_sine_wave() -> bool:
     """Test playback of a generated sine wave."""
-    print("\n" + "=" * 60)
-    print("TEST: Sine Wave Playback")
-    print("=" * 60)
+    output_dev = get_default_output_device()
+    if output_dev is None:
+        return False
 
-    device_idx = find_first_output_device()
-
-    if device_idx is None:
-        print("⊘ SKIPPED: No output device available")
-        return True
-
+    get_audio_backend()
     sample_rate = 16000
-    channels = 1
-    duration_s = 2  # 2 seconds
-    frequency = 440  # A note
-
-    print(f"Device index: {device_idx}")
-    print(f"Sample rate: {sample_rate} Hz")
-    print(f"Duration: {duration_s}s")
-    print(f"Frequency: {frequency} Hz (sine wave)")
+    duration_s = 2    # 2 seconds
+    frequency = 440    # A note
 
     # Generate sine wave
-    print("\nGenerating sine wave...", end=" ", flush=True)
-    wave = generate_sine_wave(frequency, duration_s, sample_rate)
-    print(f"✓ ({len(wave)} samples)")
+    wave_data = generate_sine_wave(frequency, duration_s, sample_rate)
 
-    pa = pyaudio.PyAudio()
-    stream = None
-    try:
-        # Open output stream
-        print("Opening output stream...", end=" ", flush=True)
-        stream = pa.open(
-            format=pyaudio.paFloat32,
-            channels=channels,
-            rate=sample_rate,
-            output=True,
-            frames_per_buffer=512,
-            output_device_index=device_idx,
-        )
-        print("✓")
+    # Play
+    player = AudioPlayer()
+    ok = player.play_data(wave_data, sample_rate, block=False)
 
-        # Play the sine wave
-        print("Playing sine wave...", end=" ", flush=True)
-        stream.write(wave.tobytes())
-        print("✓ (data sent to output buffer)")
-
-        # Wait for playback to complete
-        print("Waiting for playback...", end=" ", flush=True)
-        time.sleep(duration_s + 0.5)  # Extra time to ensure playback
-        print("✓")
-
-        print("\n✓ PASSED: Sine wave playback successful")
-        return True
-
-    except Exception as e:
-        print(f"\n✗ FAILED: {e}")
+    if not ok:
         return False
-    finally:
-        if stream:
-            try:
-                stream.stop_stream()
-                stream.close()
-            except OSError:
-                pass
-        pa.terminate()
+
+    # Wait for playback to drain
+    time.sleep(duration_s + 0.5)
+
+    player.close()
+
+    return True
 
 
-def test_playback_silence():
+def test_playback_silence() -> bool:
     """Test playback of silence (zeros)."""
-    print("\n" + "=" * 60)
-    print("TEST: Silence Playback")
-    print("=" * 60)
+    output_dev = get_default_output_device()
+    if output_dev is None:
+        return False
 
-    device_idx = find_first_output_device()
-
-    if device_idx is None:
-        print("⊘ SKIPPED: No output device available")
-        return True
-
+    get_audio_backend()
     sample_rate = 16000
-    channels = 1
     duration_s = 1
 
-    print(f"Device index: {device_idx}")
-    print(f"Sample rate: {sample_rate} Hz")
-    print(f"Duration: {duration_s}s")
-
     # Generate silence
-    print("\nGenerating silence...", end=" ", flush=True)
     silence = np.zeros(int(sample_rate * duration_s), dtype=np.float32)
-    print(f"✓ ({len(silence)} samples)")
 
-    pa = pyaudio.PyAudio()
-    stream = None
+    # Play
+    player = AudioPlayer()
+    ok = player.play_data(silence, sample_rate, block=False)
+
+    if not ok:
+        return False
+
+    time.sleep(duration_s + 0.2)
+
+    player.close()
+
+    return True
+
+
+def test_playback_tts_wav() -> bool:
+    """Test playback of TTS-generated WAV audio."""
+    output_dev = get_default_output_device()
+    if output_dev is None:
+        return False
+
+    # Load config and TTS engine
+    config = load_config()
+
     try:
-        # Open output stream
-        print("Opening output stream...", end=" ", flush=True)
-        stream = pa.open(
-            format=pyaudio.paFloat32,
-            channels=channels,
-            rate=sample_rate,
-            output=True,
-            frames_per_buffer=512,
-            output_device_index=device_idx,
-        )
-        print("✓")
+        tts_engine = TTSEngine(config)
+        tts_engine.load()
+    except Exception:
+        return False
 
-        # Play silence
-        print("Playing silence...", end=" ", flush=True)
-        stream.write(silence.tobytes())
-        print("✓ (silence sent to output buffer)")
+    # Generate audio from text
+    test_text = "Hello, how are you today?"
+    try:
+        wav_bytes = tts_engine._synthesize(test_text)
+        if wav_bytes is None:
+            tts_engine.unload()
+            return False
+    except Exception:
+        tts_engine.unload()
+        return False
 
-        # Wait for playback
-        print("Waiting for playback...", end=" ", flush=True)
-        time.sleep(duration_s + 0.2)
-        print("✓")
+    # Play the WAV bytes
+    player = AudioPlayer()
+    ok = player.play_wav_bytes(wav_bytes, block=False)
 
-        print("\n✓ PASSED: Silence playback successful")
+    tts_engine.unload()
+
+    if not ok:
+        return False
+
+    # Estimate duration from WAV bytes (approx 22050 sample rate, 16-bit mono)
+    duration_s = len(wav_bytes) / 22050 / 2
+    time.sleep(duration_s + 0.5)
+    player.close()
+
+    # Save to temporary file for verification
+    tmp_file = Path(__file__).parent.parent / ".tmp" / "test_playback_tts.wav"
+    tmp_file.parent.mkdir(exist_ok=True)
+
+    with tmp_file.open("wb") as wf:
+        _ = wf.write(wav_bytes)
+
+    return True
+
+
+def test_playback_file() -> bool:
+    """Test playback of a WAV file using play_file."""
+    output_dev = get_default_output_device()
+    if output_dev is None:
         return True
 
-    except Exception as e:
-        print(f"\n✗ FAILED: {e}")
-        return False
-    finally:
-        if stream:
-            try:
-                stream.stop_stream()
-                stream.close()
-            except OSError:
-                pass
-        pa.terminate()
+    # Use existing test.wav or create a small one
+    wav_path = Path(__file__).resolve().parent.parent / "data" / "test.wav"
+    if not wav_path.exists():
+        return True
+
+    player = AudioPlayer()
+    ok = player.play_file(wav_path)
+
+    duration_s = 1
+    time.sleep(duration_s + 0.5)
+    player.close()
+    return ok
 
 
 if __name__ == "__main__":
     success1 = test_playback_sine_wave()
     success2 = test_playback_silence()
+    success3 = test_playback_tts_wav()
+    success4 = test_playback_file()
 
-    print("\n" + "=" * 60)
-    print("SUMMARY")
-    print("=" * 60)
-    all_passed = success1 and success2
-    print(f"Overall: {'✓ PASSED' if all_passed else '✗ FAILED'}")
-
-    sys.exit(0 if all_passed else 1)
+    all_passed = success1 and success2 and success3 and success4
+    logger.info(f"Playback test {'passed' if all_passed else 'failed'}")
+    os._exit(0 if all_passed else 1)

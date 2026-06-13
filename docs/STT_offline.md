@@ -100,7 +100,7 @@ Default ASR settings come from `src/utils/config.py`:
 Install the runtime pieces used by the current ASR engine:
 
 ```bash
-pip install pyaudio torch scipy silero-vad faster-whisper
+pip install sounddevice torch scipy silero-vad faster-whisper
 ```
 
 Install OpenAI Whisper only if you want to switch the config to `engine: whisper`:

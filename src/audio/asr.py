@@ -6,13 +6,13 @@
 Automatic Speech Recognition engine combining STT + VAD.
 
 Architecture:
-  1. Microphone → capture thread (PyAudio chunks)
-  2. Silero VAD → detect speech vs silence
+  1. Microphone -> capture thread (PyAudio or sounddevice chunks)
+  2. Silero VAD -> detect speech vs silence
   3. Accumulate speech chunks
-  4. On silence detected → STT (Whisper/Faster-Whisper) → transcript
+  4. On silence detected -> STT (Whisper/Faster-Whisper) -> transcript
   5. Callback on result
 
-All offline, no cloud calls. Multiple backend support.
+All offline, no cloud calls. Exclusive backend support for sounddevice.
 """
 
 from __future__ import annotations
@@ -26,9 +26,8 @@ import queue
 import sys
 import threading
 import wave
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from importlib import import_module
-from math import gcd
 from typing import BinaryIO, Protocol, cast
 
 import numpy as np
@@ -38,10 +37,28 @@ from numpy.typing import NDArray
 # Ensure 'src' is in sys.path
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from src.audio.audio_utils import suppress_pa_stderr
+from src.audio.audio_utils import AudioInputStream, open_input_stream_with_fallback
 from src.utils.config import Config
+from src.utils.sysutils import limit_cpu_for_multiprocessing, detect_raspberry_pi_model
 
-logger = logging.getLogger(__name__)
+module_name = __name__
+lib_name = module_name.split('.')[1]
+logger = logging.getLogger(lib_name)
+
+USE_ONNX = True
+
+class _ResamplePoly(Protocol):
+    def __call__(
+        self, x: NDArray[np.float32], up: int, down: int
+    ) -> NDArray[np.float32]: ...
+
+
+def _resample_poly(
+    audio: NDArray[np.float32], up: int, down: int
+) -> NDArray[np.float32]:
+    scipy_signal = import_module("scipy.signal")
+    resample_poly = cast(_ResamplePoly, getattr(scipy_signal, "resample_poly"))
+    return resample_poly(audio, up, down)
 
 
 class _WhisperSegmentLike(Protocol):
@@ -74,43 +91,7 @@ class _VadModelLike(Protocol):
     def __call__(self, audio: object, sample_rate: int) -> _VadScoreLike: ...
 
 
-class _PyAudioStreamLike(Protocol):
-    def read(self, num_frames: int, exception_on_overflow: bool = ...) -> bytes: ...
-
-    def stop_stream(self) -> None: ...
-
-    def close(self) -> None: ...
-
-
-class _PyAudioLike(Protocol):
-    def open(
-        self,
-        *,
-        format: int,
-        channels: int,
-        rate: int,
-        input: bool,
-        frames_per_buffer: int,
-        input_device_index: int | None = ...,
-    ) -> _PyAudioStreamLike: ...
-
-    def terminate(self) -> None: ...
-
-    def get_device_info_by_index(self, index: int) -> Mapping[str, object]: ...
-
-
-class _ResamplePoly(Protocol):
-    def __call__(
-        self, x: NDArray[np.float32], up: int, down: int
-    ) -> NDArray[np.float32]: ...
-
-
-def _resample_poly(
-    audio: NDArray[np.float32], up: int, down: int
-) -> NDArray[np.float32]:
-    scipy_signal = import_module("scipy.signal")
-    resample_poly = cast(_ResamplePoly, getattr(scipy_signal, "resample_poly"))
-    return resample_poly(audio, up, down)
+# resample_audio imported from src.audio.audio_utils
 
 
 class ASREngine:
@@ -138,17 +119,22 @@ class ASREngine:
         self._audio_queue: queue.Queue[bytes | None] = queue.Queue()
         self._transcript_callback: Callable[[str], None] | None = None
 
-        self._running = False
+        self._running: bool = False
         self._capture_thread: threading.Thread | None = None
         self._process_thread: threading.Thread | None = None
 
-        self._pa: _PyAudioLike | None = None
-        self._stream: _PyAudioStreamLike | None = None
-        self._chunk_frames = 0
-        self._capture_rate = 0
-        self._need_resample = False
-        self._resample_up = 1
-        self._resample_down = 1
+        # Audio backend components
+        self._backend: str = ""
+        self._stream: AudioInputStream | None = None
+        self._chunk_frames: int = 0
+        self._capture_rate: int = 0
+        self._need_resample: bool = False
+        self._resample_up: int = 1
+        self._resample_down: int = 1
+
+        # WAV writer — opened in start(), written by _process_thread, closed in stop()
+        self._wav_writer: wave.Wave_write | None = None
+        self._wav_writer_lock: threading.Lock = threading.Lock()
 
     # ====================================================================
     # Lifecycle
@@ -160,7 +146,7 @@ class ASREngine:
         self._load_stt_model()
         self._load_vad_model()
         logger.info(
-            "ASR ready (engine=%s, lang=%s)",
+            "ASR ready (engine=%s, lang=%s, backend=sounddevice)",
             self._config.asr.engine,
             self._config.asr.language,
         )
@@ -210,12 +196,16 @@ class ASREngine:
         try:
             if self._stt_model is None:
                 logger.info(f"Loading Whisper model {self._config.asr.model_size}...")
-                self._stt_model = cast(_WhisperModelLike,
+                self._stt_model = cast(
+                    _WhisperModelLike,
+                    cast(
+                        object,
                         whisper.load_model(
-                                name=self._config.asr.model_size,
-                                device=self._config.asr.device,
-                                download_root=str(self._config.asr.download_path),
+                            name=self._config.asr.model_size,
+                            device=self._config.asr.device,
+                            download_root=str(self._config.asr.download_path),
                         ),
+                    ),
                 )
             return
         except Exception as e:
@@ -231,15 +221,20 @@ class ASREngine:
             return
         try:
             if self._stt_model is None:
-                logger.info("Loading Faster-Whisper %s...", self._config.asr.model_size)
-                self._stt_model = cast(_FasterWhisperModelLike,
-                            faster_whisper.WhisperModel(
-                                model_size_or_path=self._config.asr.model_size,
-                                device=self._config.asr.device,
-                                compute_type=self._config.asr.compute_type,
-                                cpu_threads=1,
-                                num_workers=1,
-                            ),
+                logger.info("Loading Faster-Whisper %s, from dir: %s", self._config.asr.model_size, self._config.asr.download_path)
+                self._stt_model = cast(
+                    _FasterWhisperModelLike,
+                    cast(
+                        object,
+                        faster_whisper.WhisperModel(
+                            model_size_or_path=self._config.asr.model_size,
+                            device=self._config.asr.device,
+                            compute_type=self._config.asr.compute_type,
+                            download_root=str(self._config.asr.download_path),
+                            cpu_threads=1,
+                            num_workers=1,
+                        ),
+                    ),
                 )
                 logger.info("Faster-Whisper loaded")
                 return
@@ -249,18 +244,14 @@ class ASREngine:
 
     @staticmethod
     def _configure_torch_runtime() -> None:
-        """Keep Torch execution single-threaded for stability in audio workers."""
+        """Keep Torch execution single-threaded for stability in audio workers,
+        if raspberry pi detected."""
         try:
             import torch
 
-            torch.set_num_threads(1)
-        except Exception:
-            pass
+            if detect_raspberry_pi_model():
+                torch.set_num_threads(num=limit_cpu_for_multiprocessing(desired_cores=1))
 
-        try:
-            import torch
-
-            torch.set_num_interop_threads(1)
         except Exception:
             pass
 
@@ -269,7 +260,7 @@ class ASREngine:
         try:
             from silero_vad import load_silero_vad
 
-            self._vad_model = cast(_VadModelLike, load_silero_vad())
+            self._vad_model = cast(_VadModelLike, load_silero_vad(onnx=USE_ONNX))
             logger.info("Silero VAD loaded")
         except Exception as e:
             logger.exception(
@@ -298,6 +289,20 @@ class ASREngine:
             self._running = False
             return
 
+        # Open WAV writer for audio storage
+        if self._config.asr.store_audio and self._config.asr.store_audio_path:
+            store_path = pathlib.Path(self._config.asr.store_audio_path)
+            try:
+                store_path.parent.mkdir(parents=True, exist_ok=True)
+                wf = wave.open(str(store_path), "wb")
+                wf.setnchannels(1)
+                wf.setsampwidth(2)  # int16
+                wf.setframerate(self._config.audio.input_sample_rate)
+                self._wav_writer = wf
+                logger.info("Audio storage initialized: %s", self._config.asr.store_audio_path)
+            except OSError as e:
+                logger.warning("Audio storage disabled — could not open WAV file %s: %s", store_path, e)
+
         self._capture_thread = threading.Thread(
             target=self._capture_loop, daemon=False, name="asr-capture"
         )
@@ -307,188 +312,100 @@ class ASREngine:
         self._capture_thread.start()
         self._process_thread.start()
 
-        logger.info("ASR listening...")
+        logger.info("ASR listening with %s backend...", self._backend or "auto")
 
     def stop(self) -> None:
         """Stop listening and clean up threads."""
         self._running = False
         current_thread = threading.current_thread()
 
-        # Suppress PortAudio/ALSA stderr noise across the entire teardown
-        # (mmap drain errors, residual JACK messages, etc. are all cosmetic).
-        with suppress_pa_stderr():
-            # Stop the stream first so any blocking read() call can unwind,
-            # then wait for the capture thread to exit before closing the
-            # underlying PortAudio stream object.
-            if self._stream:
+        if self._stream is not None:
+            with contextlib.suppress(Exception):
+                self._stream.stop()
+
+        if self._capture_thread and self._capture_thread is not current_thread:
+            self._capture_thread.join(timeout=5.0)
+
+        if self._stream is not None:
+            with contextlib.suppress(Exception):
+                self._stream.close()
+            self._stream = None
+
+        while True:
+            try:
+                _ = self._audio_queue.get_nowait()
+            except queue.Empty:
+                break
+
+        if self._process_thread:
+            self._audio_queue.put(None)  # sentinel
+            if self._process_thread is not current_thread:
+                self._process_thread.join(timeout=5.0)
+                if self._process_thread.is_alive():
+                    logger.warning(
+                        "ASR process thread did not exit before shutdown completed"
+                    )
+
+        # Close WAV writer only after process thread has exited (no more writes)
+        with self._wav_writer_lock:
+            if self._wav_writer is not None:
                 with contextlib.suppress(Exception):
-                    self._stream.stop_stream()
-
-            if self._capture_thread and self._capture_thread is not current_thread:
-                self._capture_thread.join(timeout=5.0)
-
-            if self._stream and (
-                not self._capture_thread or not self._capture_thread.is_alive()
-            ):
-                with contextlib.suppress(Exception):
-                    self._stream.close()
-                logger.info("Audio stream closed")
-            elif self._stream:
-                logger.warning(
-                    "ASR stream left open because capture thread is still alive"
-                )
-
-            # Drop any queued audio so shutdown does not wait for the process
-            # thread to chew through an entire backlog before it sees the
-            # sentinel. That backlog can be large and keep native libraries
-            # alive long enough to crash during interpreter teardown.
-            while True:
-                try:
-                    self._audio_queue.get_nowait()
-                except queue.Empty:
-                    break
-
-            # Let the processing thread exit immediately after capture stops.
-            if self._process_thread:
-                self._audio_queue.put(None)  # sentinel
-                if self._process_thread is not current_thread:
-                    self._process_thread.join(timeout=5.0)
-                    if self._process_thread.is_alive():
-                        logger.warning(
-                            "ASR process thread did not exit before shutdown completed"
-                        )
-
-            # Safe to terminate now that no threads are using PortAudio
-            if self._pa:
-                with contextlib.suppress(Exception):
-                    self._pa.terminate()
+                    self._wav_writer.close()
+                self._wav_writer = None
 
         logger.info("ASR stopped")
 
     # ====================================================================
-    # Capture thread (PyAudio → queue)
+    # Capture thread (sounddevice -> queue)
     # ====================================================================
-    def _resolve_device_candidates(self) -> list[int | None]:
-        if self._pa is None:
-            return [None]
-
-        candidates: list[int | None] = []
-        if self._config.audio.input_device_index is not None:
-            try:
-                info = self._pa.get_device_info_by_index(
-                    self._config.audio.input_device_index
-                )
-                max_channels_raw = info.get("maxInputChannels", 0)
-                try:
-                    max_channels = int(cast(int | float | str, max_channels_raw))
-                except (TypeError, ValueError):
-                    max_channels = 0
-
-                if max_channels > 0:
-                    candidates.append(self._config.audio.input_device_index)
-                else:
-                    logger.warning(
-                        "ASR: configured input device %s has no input channels; using default.",
-                        self._config.audio.input_device_index,
-                    )
-            except Exception:
-                logger.warning(
-                    "ASR: configured input device %s is unavailable; using default.",
-                    self._config.audio.input_device_index,
-                )
-                candidates.append(None)
-
-        # Always try the system default microphone as a fallback.
-        # This is the common case when the config leaves input_device_index unset.
-        if None not in candidates:
-            candidates.append(None)
-
-        return candidates
-
-    def _try_open(
-        self, pa_format: int, rate: int, dev_idx: int | None
-    ) -> tuple[_PyAudioStreamLike | None, int]:
-        chunk = int(rate * self._config.audio.input_chunk_ms / 1000)
-        try:
-            if self._pa is None:
-                return None, 0
-            return self._pa.open( # type: ignore[no-any-return]
-                format=pa_format,
-                channels=1,
-                rate=rate,
-                input=True,
-                frames_per_buffer=chunk,
-                input_device_index=dev_idx,
-            ), chunk
-        except Exception:
-            logger.exception("Failed to open audio stream")
-            return None, 0
 
     def _open_input_stream(self) -> bool:
         """Open the microphone stream before worker threads start."""
         try:
-            import pyaudio
-        except ImportError:
-            logger.exception("pyaudio not installed. ASR will be disabled.")
-            return False
-
-        model_rate = self._config.audio.input_sample_rate
-        device_index = self._config.audio.input_device_index
-        candidate_rates = [model_rate, 44100, 48000, 22050, 8000]
-
-        try:
-            with suppress_pa_stderr():
-                self._pa = cast(_PyAudioLike, pyaudio.PyAudio())
-
-            stream, chunk_frames, capture_rate = None, 0, model_rate
-            tried: list[tuple[int | None, int]] = []
-            device_candidates = self._resolve_device_candidates()
-
-            for dev in device_candidates:
-                for rate in candidate_rates: # type: ignore[attr-defined]
-                    s, ch = self._try_open(pyaudio.paInt16, rate, dev)
-                    if s is not None:
-                        stream, chunk_frames, capture_rate = s, ch, rate
-                        if dev != device_index:
-                            logger.warning(
-                                "ASR: device %s unavailable; using system default.",
-                                device_index,
-                            )
-                        if rate != model_rate:
-                            logger.info(
-                                "ASR: device native rate is %d Hz; will resample to %d Hz.",
-                                rate,
-                                model_rate,
-                            )
-                        break
-                    tried.append((dev, rate))
-                if stream is not None:
-                    break
-
-            if stream is None:
-                logger.error("ASR: could not open any microphone. Tried: %s", tried)
-                if self._pa:
-                    with contextlib.suppress(Exception):
-                        self._pa.terminate()
-                    self._pa = None
+            opened = open_input_stream_with_fallback(
+                rate=self._config.audio.input_sample_rate,
+                chunk_ms=self._config.audio.input_chunk_ms,
+                device_index=self._config.audio.input_device_index,
+                candidate_rates=[
+                    self._config.audio.input_sample_rate,
+                    44100,
+                    48000,
+                    22050,
+                    8000,
+                ],
+                dtype="float32",
+            )
+            if opened is None:
+                logger.error("ASR: could not open any microphone.")
                 return False
-            self._stream = stream
-            self._chunk_frames = chunk_frames
-            self._capture_rate = capture_rate
-            self._need_resample = capture_rate != model_rate
-            if self._need_resample:
-                g = gcd(model_rate, capture_rate)
-                self._resample_up = model_rate // g
-                self._resample_down = capture_rate // g
+
+            self._backend = opened.backend
+            self._stream = opened.stream
+            self._chunk_frames = opened.native_chunk_frames
+            self._capture_rate = opened.capture_rate
+            self._need_resample = opened.need_resample
+            self._resample_up = opened.resample_up
+            self._resample_down = opened.resample_down
+
+            if opened.device_index != self._config.audio.input_device_index:
+                logger.warning(
+                    "ASR: device %s unavailable; using system default.",
+                    self._config.audio.input_device_index,
+                )
+            if opened.capture_rate != self._config.audio.input_sample_rate:
+                logger.info(
+                    "ASR: device native rate is %d Hz; will resample to %d Hz.",
+                    opened.capture_rate,
+                    self._config.audio.input_sample_rate,
+                )
 
             logger.debug(
                 "ASR capture started (device=%s, capture_rate=%d, chunk=%dms)",
-                device_index,
-                capture_rate,
+                opened.device_index,
+                opened.capture_rate,
                 self._config.audio.input_chunk_ms,
             )
             return True
-
         except Exception as e:
             logger.exception("ASR capture setup error: %s", e)
             return False
@@ -509,6 +426,8 @@ class ASREngine:
                 raw = self._stream.read(
                     num_frames=self._chunk_frames, exception_on_overflow=False
                 )
+                if not raw:
+                    continue
                 if self._need_resample:
                     pcm = np.frombuffer(raw, dtype=np.int16).astype(np.float32)
                     pcm = _resample_poly(pcm, self._resample_up, self._resample_down)
@@ -543,6 +462,9 @@ class ASREngine:
 
             if chunk is None:  # sentinel
                 break
+
+            # Store all captured audio chunks for validation purposes
+            self._store_audio(chunk)
 
             is_speech = self._detect_speech(chunk)
 
@@ -591,6 +513,13 @@ class ASREngine:
         rms = math.sqrt(float(np.mean(audio**2)))
         return rms > 300  # empirical threshold for standard USB mic
 
+    def _store_audio(self, audio_bytes: bytes) -> None:
+        """Write audio bytes as WAV frames to the open wav writer."""
+        with self._wav_writer_lock:
+            if self._wav_writer is not None:
+                self._wav_writer.writeframes(audio_bytes)
+                logger.debug("Audio chunk stored: %s", self._config.asr.store_audio_path)
+
     def _transcribe(self, audio_bytes: bytes) -> None:
         """Transcribe accumulated audio buffer."""
         if self._stt_model is None:
@@ -614,8 +543,8 @@ class ASREngine:
             wf.setnchannels(1)
             wf.setsampwidth(2)  # int16
             wf.setframerate(self._config.audio.input_sample_rate)
-            wf.writeframes(audio_bytes)
-        wav_buffer.seek(0)
+            _ = wf.writeframes(audio_bytes)
+        _=wav_buffer.seek(0)
 
         if self._config.asr.engine in {"faster-whisper", "faster_whisper"}:
             model = cast(_FasterWhisperModelLike | None, self._stt_model)
@@ -642,6 +571,7 @@ class ASREngine:
                 word_timestamps=True,
                 fp16=False,
             )
+
         return self._extract_text_from_result(result)
 
     def _extract_text_from_result(self, result: object) -> str:
@@ -661,6 +591,8 @@ class ASREngine:
                 segments_source = cast(_WhisperResultLike, result).segments
             elif isinstance(result, list):
                 segments_source = cast(list[object], result)
+            elif isinstance(result, Iterable) and not isinstance(result, (str, bytes)):
+                segments_source = result
             else:
                 segments_source = [result]
 

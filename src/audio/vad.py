@@ -1,3 +1,4 @@
+# !/usr/bin/env python3
 """src/audio/vad.py.
 =================
 Voice Activity Detection using Silero VAD.
@@ -18,8 +19,7 @@ import pathlib
 import sys
 from importlib import import_module
 from torch._tensor import Tensor
-from torch._tensor import Tensor
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import Protocol, cast
 
 import numpy as np
 import torch
@@ -40,10 +40,8 @@ WHISPER_MODEL_SIZES = [
 ENGLISH_ONLY_COMPATIBLE = ["tiny", "base", "small", "medium"]
 
 
-from utils.sysutils import detect_raspberry_pi_model, limit_cpu_for_multiprocessing
-
-if TYPE_CHECKING:
-    from utils.config import Config
+from src.utils.sysutils import detect_raspberry_pi_model, limit_cpu_for_multiprocessing
+from src.utils.config import Config  # TYPE_CHECKING
 
 
 class _VadModelLike(Protocol):
@@ -109,11 +107,11 @@ class VADEngine:
     def _apply_platform_tuning(self) -> None:
         """Adjust model sizes and CPU limits for Raspberry Pi vs desktop."""
         if detect_raspberry_pi_model():
-            limit_cpu_for_multiprocessing(self.config.cpu_cores)
+            _ = limit_cpu_for_multiprocessing(self.config.cpu_cores)
             self._suffix_model_size("stt_model_size")
             self._suffix_model_size("faster_stt_model_size")
         else:
-            limit_cpu_for_multiprocessing()  # use all cores
+            _ = limit_cpu_for_multiprocessing()  # use all cores
             self.config.stt_model_size = "base"
 
     def _suffix_model_size(self, attr: str) -> None:

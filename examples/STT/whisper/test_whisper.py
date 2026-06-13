@@ -6,7 +6,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Any, Protocol, cast
 
 import whisper
 
@@ -41,21 +41,22 @@ print_time_usage("Init", start_time)
 
 
 class _WhisperModelLike(Protocol):
-    def transcribe(self, audio: str, **kwargs: object) -> dict[str, object]: ...
+    def transcribe(self, audio: str, **kwargs: Any) -> dict[str, Any]: ...
+
 
 # --- Optional parameters ---
 CORES_TO_USE = 2  # Limit to 2 cores
 # limit_cpu_for_multiprocessing(CORES_TO_USE)
 model_id = "medium"
 if detect_raspberry_pi_model():
-    limit_cpu_for_multiprocessing(CORES_TO_USE)
+    _ = limit_cpu_for_multiprocessing(CORES_TO_USE)
     model_id = f"tiny{'.en' if ENGLISH else ''}"  # "tiny" (Recommended model for low resources)
 else:
-    limit_cpu_for_multiprocessing()  # Use all available cores
+    _ = limit_cpu_for_multiprocessing()  # Use all available cores
     model_id = "medium"  # "large-v3", "medium", "small", "large-v3", "base", "tiny"
 print_time_usage("After model load", start_time)
 # --- Whisper Transcription ---
-model = cast(_WhisperModelLike, whisper.load_model(model_id, download_root=MODEL_DIR))
+model = cast("_WhisperModelLike", whisper.load_model(model_id, download_root=MODEL_DIR))
 # download_root = "~/.cache/whisper" # Optional, default is ~/.cache/whisper
 # device = "cpu"  or "cuda" if you have a GPU and the right setup
 # device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -70,8 +71,9 @@ try:
         task="translate" if TRANSLATE else "transcribe",
     )
     print_time_usage("After transcription", start_time)
+    print(result["text"])
 except RuntimeError:
     pass
 
 # Force cleanup
-gc.collect()
+_ = gc.collect()

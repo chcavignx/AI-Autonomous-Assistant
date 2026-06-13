@@ -10,7 +10,7 @@ from tests.audio._helpers import has_asr_model_cached
 
 
 @pytest.mark.integration
-def test_repository_sample_audio_transcribes():
+def test_repository_sample_audio_transcribes() -> None:
     config = load_config()
     if not has_asr_model_cached(config):
         pytest.skip("ASR model not cached; skipping sample audio transcription")
@@ -20,9 +20,7 @@ def test_repository_sample_audio_transcribes():
     assert audio_path.exists(), f"Sample audio not found at {audio_path}"
 
     asr = ASREngine(config)
-    asr._configure_torch_runtime()
-    asr._load_stt_model()
-    assert asr._stt_model is not None
+    asr.load()
 
     text = asr.transcribe_file(str(audio_path)).strip()
     assert text, "Expected transcription from sample audio file"

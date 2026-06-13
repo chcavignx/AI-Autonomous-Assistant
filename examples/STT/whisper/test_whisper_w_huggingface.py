@@ -14,14 +14,11 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
+
 
 import torch
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
-from transformers.feature_extraction_utils import PreTrainedFeatureExtractor
-from transformers.modeling_utils import PreTrainedModel
-from transformers.tokenization_python import PreTrainedTokenizer
-from transformers.tokenization_utils_tokenizers import PreTrainedTokenizerFast
 
 project_root = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -32,6 +29,12 @@ from src.utils.sysutils import (
     limit_cpu_for_multiprocessing,
     print_time_usage,
 )
+
+if TYPE_CHECKING:
+    from transformers.feature_extraction_utils import PreTrainedFeatureExtractor
+    from transformers.modeling_utils import PreTrainedModel
+    from transformers.tokenization_python import PreTrainedTokenizer
+    from transformers.tokenization_utils_tokenizers import PreTrainedTokenizerFast
 
 # Paths to the model and config files for French and English voices
 MODEL_DIR = str(config.paths.models_path / "whisper")
@@ -49,15 +52,15 @@ class _ProcessorLike(Protocol):
 
 
 class _PipelineLike(Protocol):
-    def __call__(self, audio: str, *, generate_kwargs: dict[str, str]) -> object: ...
+    def __call__(self, audio: str, *, generate_kwargs: dict[str, str]) -> Any: ...
 
 
 class _ModelFromPretrained(Protocol):
-    def __call__(self, pretrained_model_name_or_path: str, **kwargs: object) -> PreTrainedModel: ...
+    def __call__(self, pretrained_model_name_or_path: str, **kwargs: Any) -> PreTrainedModel: ...
 
 
 class _ProcessorFromPretrained(Protocol):
-    def __call__(self, pretrained_model_name_or_path: str, **kwargs: object) -> _ProcessorLike: ...
+    def __call__(self, pretrained_model_name_or_path: str, **kwargs: Any) -> _ProcessorLike: ...
 
 
 def main() -> None:
@@ -67,7 +70,8 @@ def main() -> None:
 
     if detect_raspberry_pi_model():
         os.environ["PYTORCH_JIT"] = "0"
-        limit_cpu_for_multiprocessing(cores_to_use)
+        _core: int = limit_cpu_for_multiprocessing(cores_to_use)
+        # cast to Any to avoid attribute access issues if imports failed
         torch.set_float32_matmul_precision("high")  # For Pi 5
         torch.backends.cuda.matmul.allow_tf32 = True  # For Pi 5
         torch.set_num_threads(cores_to_use)  # Adjust based on your Pi's CPU cores
@@ -76,7 +80,7 @@ def main() -> None:
         # model_id = "distil-whisper/distil-large-v3"
         # dataset_name = "distil-whisper/librispeech_long"
     else:
-        limit_cpu_for_multiprocessing()  # Use all available cores
+        _ = limit_cpu_for_multiprocessing()  # Use all available cores
         # For more powerfull devices, you can use a larger model
         model_id = "openai/whisper-large-v3-turbo"
 
@@ -87,23 +91,26 @@ def main() -> None:
     # Model loading
     # ----------------------
     start_time = time.time()
-    model_from_pretrained = cast(_ModelFromPretrained, AutoModelForSpeechSeq2Seq.from_pretrained)
+    model_from_pretrained = cast("_ModelFromPretrained", AutoModelForSpeechSeq2Seq.from_pretrained)
     model = cast(
-        _ModelLike,
-        model_from_pretrained(
-            pretrained_model_name_or_path=model_id,
-            cache_dir=cache_dir,
-            torch_dtype=torch.float16,  # Use float16
-            local_files_only=True,  # Use only local cached files
-            low_cpu_mem_usage=bool(detect_raspberry_pi_model()),  # Critical for Pi
-            use_safetensors=True,
+        "_ModelLike",
+        cast(
+            "object",
+            model_from_pretrained(
+                pretrained_model_name_or_path=model_id,
+                cache_dir=cache_dir,
+                torch_dtype=torch.float16,  # Use float16
+                local_files_only=True,  # Use only local cached files
+                low_cpu_mem_usage=bool(detect_raspberry_pi_model()),  # Critical for Pi
+                use_safetensors=True,
+            ),
         ),
     )
     # print_sys_usage("After model load")
     print_time_usage("After model load", start_time)
 
     start_time = time.time()
-    processor_from_pretrained = cast(_ProcessorFromPretrained, AutoProcessor.from_pretrained)
+    processor_from_pretrained = cast("_ProcessorFromPretrained", AutoProcessor.from_pretrained)
     processor = processor_from_pretrained(
             model_id,
             cache_dir=cache_dir,
@@ -133,27 +140,30 @@ def main() -> None:
     # Move model to device
     # ----------------------
     start_time = time.time()
-    model.to(device)
+    _ = model.to(device)
     # print_sys_usage("After model.to(device)")
     print_time_usage("After model.to(device)", start_time)
 
     # Force cleanup
-    gc.collect()
+    _ = gc.collect()
 
     # ----------------------
     # ASR Pipeline
     # ----------------------
     start_time = time.time()
     pipe = cast(
-        _PipelineLike,
-        pipeline(
-            "automatic-speech-recognition",
-            model=cast(PreTrainedModel, model),
-            tokenizer=processor.tokenizer,
-            feature_extractor=processor.feature_extractor,
-            torch_dtype=torch_dtype,
-            device=-1,
-            model_kwargs={"low_cpu_mem_usage": bool(detect_raspberry_pi_model())},
+        "_PipelineLike",
+        cast(
+            "object",
+            pipeline(
+                task="automatic-speech-recognition",
+                model=model,
+                tokenizer=processor.tokenizer,
+                feature_extractor=processor.feature_extractor,
+                torch_dtype=torch_dtype,
+                device=-1,
+                model_kwargs={"low_cpu_mem_usage": bool(detect_raspberry_pi_model())},
+            ),
         ),
     )
     # print_sys_usage("After pipeline creation")
@@ -183,13 +193,10 @@ def main() -> None:
     # Results
     # ----------------------
     if result is not None:
-        pass
-        # print(result)  # Uncomment to display all
-
-    # print(result)  # Uncomment to display all
+        print(result)
 
     # Force cleanup
-    gc.collect()
+    _ = gc.collect()
 
 
 if __name__ == "__main__":

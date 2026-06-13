@@ -63,10 +63,10 @@ Here is a prioritization proposed for the context: Raspberry Pi 5, Hailo-8L, NVM
 ### Sequenced Guides for Different Modules
 
 - **Audio Modules**
-    1. [Offline Speech Recognition (STT)](STT_offline.md)
-    2. [Offline Text-to-Speech (TTS)](TTS_offline.md)
-    3. [Voice stack and VAD models](STS_VAD_models.md)
-    4. [USB microphone and speaker test](audio_usb_test.md)
+    1. [USB microphone and speaker test](audio_usb_test.md)
+    2. [Offline Speech Recognition (STT)](STT_offline.md)
+    3. [Offline Text-to-Speech (TTS)](TTS_offline.md)
+    4. [Voice stack and VAD models](STS_VAD_models.md)
     5. [Offline Speech-to-Speech demo](../examples/VAD/voice_agent_offline.md)
         Demo application that listens for a wake word, transcribes the next utterance, generates a keyword response, and speaks it back (`examples/VAD/voice_agent_offline.py`)
 

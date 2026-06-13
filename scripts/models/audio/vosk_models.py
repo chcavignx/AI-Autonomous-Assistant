@@ -3,10 +3,9 @@
 to a local cache directory.
 """
 
-import zipfile
-
 import pathlib
 import sys
+import zipfile
 
 import requests
 from models_check import model_exists

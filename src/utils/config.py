@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import logging.config
 import sys
 from collections.abc import Mapping
 from pathlib import Path
@@ -24,6 +26,7 @@ class PathConfig(BaseModel):
     data: str = "data"
     cache: str = ".cache"
     models: str = "models"
+    tmp: str = ".tmp"
 
     @property
     def src_path(self) -> Path:
@@ -50,11 +53,6 @@ class PathConfig(BaseModel):
         """Returns the path to the models directory."""
         return self.cache_path / "audio" / self.models
 
-    @property
-    def models_vision_path(self) -> Path:
-        """Returns the path to the models directory."""
-        return self.cache_path / "vision" / self.models
-
 
 class ASRConfig(PathConfig):
     """Configuration for ASR (Automatic Speech Recognition / Speech-to-Text) settings."""
@@ -70,6 +68,8 @@ class ASRConfig(PathConfig):
     device: str = "cpu"  # Pi5 : CPU (or "hailo")
     compute_type: str = "int8"  # INT8 = 2x plus rapide sur ARM
     skip_native_teardown: bool = False
+    store_audio: bool = False
+    store_audio_path: str | None = None
 
     @property
     def download_path(self) -> Path:
@@ -92,7 +92,7 @@ class TTSConfig(PathConfig):
     """Configuration for TTS (Text-to-Speech) settings."""
 
     engine: str = "piper"
-    model_name: str = "en_US-hfc_female-medium.onnx"
+    model_name: str = "jarvis-medium.onnx"
     model_path: str | None = None
     cli_mode: bool = False
     device: str = "cpu"  # Pi5 : CPU (or "hailo")
@@ -162,9 +162,10 @@ class AudioConfig(PathConfig):
     input_sample_rate: int = 22050
     input_chunk_ms: int = 30  # taille des chunks audio en ms
     input_chunk_size: int = 500
-    input_device_index: int | None = None  # None = périphérique système par défaut
+    input_device_index: int | None = None  # None = default input device
+    input_device_name: str | None = None  # Optional name of input device to select (overrides index if found)
     volume: float = 0.5  # half as loud
-    output_device_index: int | None = None  # None = périphérique système par défaut
+    output_device_index: int | None = None  # None = default output device
     output_sample_rate: int = 22050
     output_chunk_ms: int = 30  # taille des chunks audio en ms
     output_chunk_size: int = 500
@@ -199,12 +200,20 @@ class PlatformConfig(PathConfig):
 
     def __post_init__(self) -> None:
         """Apply platform-specific tuning after initialization."""
-        self.is_raspberry_pi()
-        self.cpu_limit()
+        _ = self.is_raspberry_pi()
+        _ = self.cpu_limit()
 
 
 class Config:
     """Configuration for the voice agent."""
+
+    paths: PathConfig
+    asr: ASRConfig
+    tts: TTSConfig
+    wake: WakeConfig
+    vad: VADConfig
+    audio: AudioConfig
+    platform: PlatformConfig
 
     def __init__(self, **data: object) -> None:
         """Build a configuration object from keyword data."""
@@ -280,6 +289,7 @@ def load_config(config_path: Path | None = None) -> Config:
         config_path = ROOT_DIR / "config.yaml"
 
     # Security: Resolve paths and validate that the config is within allowed directories
+    is_safe = True
     try:
         abs_config_path = config_path.resolve()
         abs_root_dir = ROOT_DIR.resolve()
@@ -291,15 +301,15 @@ def load_config(config_path: Path | None = None) -> Config:
             or abs_root_dir in abs_config_path.parents
             or abs_user_dir in abs_config_path.parents
         )
-
-        if not is_safe:
-            msg = f"Security error: Configuration path {config_path} is outside allowed directories."
-            raise ValueError(msg)
     except (OSError, RuntimeError):
         # If path cannot be resolved, but we are trying to open it, that's a risk.
         # However, if it doesn't exist, the .exists() check below handles the UI.
         # We only block if we CAN resolve it and it's unsafe.
         pass
+
+    if not is_safe:
+        msg = f"Security error: Configuration path {config_path} is outside allowed directories."
+        raise ValueError(msg)
 
     if not config_path.exists():
         return Config()
@@ -333,3 +343,18 @@ def setup_python_path() -> None:
     root_str = str(ROOT_DIR)
     if root_str not in sys.path:
         sys.path.insert(0, root_str)
+
+
+def setup_config_logging() -> None:
+    """Set up the logging configuration module."""
+    log_file = ROOT_DIR / "log.json"
+
+    log_path = Path(config.paths.tmp + "/filename.log")
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with Path(log_file).open("r", encoding="utf-8") as f:
+        logging.config.dictConfig(json.load(f))  # pyright: ignore[reportAny]
+
+
+setup_python_path()
+setup_config_logging()

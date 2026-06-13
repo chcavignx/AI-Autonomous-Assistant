@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import numpy as np
+import pytest
 from src.audio.vad import VADEngine
 from src.audio.wake_word import WakeWordDetector
 from src.utils.config import Config
 
+pytestmark = pytest.mark.basic
 
-def test_vad_is_speech_detected(monkeypatch):
+
+def test_vad_is_speech_detected(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_config = MagicMock()
     mock_config.vad.threshold = 0.5
     mock_config.vad.sample_rate = 16000
@@ -36,7 +40,7 @@ def test_vad_is_speech_detected(monkeypatch):
     assert not vad.is_speech_detected(short_audio)
 
 
-def test_vad_get_speech_segments(monkeypatch):
+def test_vad_get_speech_segments(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("src.audio.vad.load_silero_vad", MagicMock)
     config = Config()
     vad = VADEngine(config)
@@ -55,7 +59,7 @@ def test_vad_get_speech_segments(monkeypatch):
     assert result == segments
 
 
-def test_vad_get_speech_segments_error(monkeypatch):
+def test_vad_get_speech_segments_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("src.audio.vad.load_silero_vad", MagicMock)
     config = Config()
     vad = VADEngine(config)
@@ -68,7 +72,7 @@ def test_vad_get_speech_segments_error(monkeypatch):
     assert result == []
 
 
-def test_wake_word_load(monkeypatch):
+def test_wake_word_load(monkeypatch: pytest.MonkeyPatch) -> None:
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir)
 
@@ -97,7 +101,7 @@ def test_wake_word_load(monkeypatch):
         assert wwd._model == "mock_model"
 
 
-def test_wake_word_detect_loop(monkeypatch):
+def test_wake_word_detect_loop(monkeypatch: pytest.MonkeyPatch) -> None:
     config = Config()
     wwd = WakeWordDetector(config)
     wwd._running = True
@@ -122,16 +126,16 @@ def test_wake_word_detect_loop(monkeypatch):
     assert callback_called
 
 
-def test_wake_word_open_input_stream(monkeypatch):
+def test_wake_word_open_input_stream(monkeypatch: pytest.MonkeyPatch) -> None:
     config = Config()
     wwd = WakeWordDetector(config)
 
-    mock_pa = MagicMock()
+    mock_sd = MagicMock()
     mock_stream = MagicMock()
-    mock_pa.open.return_value = mock_stream
-    mock_pa.get_device_info_by_index.return_value = {"defaultSampleRate": 16000}
+    mock_sd.InputStream.return_value = mock_stream
+    mock_sd.query_devices.return_value = [{"name": "Mic", "max_input_channels": 1, "default_samplerate": 16000.0}]
 
-    monkeypatch.setattr("pyaudio.PyAudio", lambda: mock_pa)
+    monkeypatch.setitem(sys.modules, "sounddevice", mock_sd)
 
     result = wwd._open_input_stream()
     assert result is True

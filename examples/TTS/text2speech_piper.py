@@ -3,6 +3,7 @@
 
 import os
 import pathlib
+import sys
 import wave
 from collections.abc import Iterable
 from os import PathLike
@@ -10,9 +11,12 @@ from typing import Protocol, cast
 
 import numpy as np
 from numpy.typing import NDArray
-import sounddevice as sd
 from piper import PiperVoice, SynthesisConfig
 
+# Ensure repo root is accessible
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
+
+from src.audio.audio_utils import create_output_stream
 from src.utils.config import config
 
 # Paths to the model and config files for French and English voices
@@ -55,16 +59,6 @@ class _PiperVoiceLike(Protocol):
     def synthesize(self, text: str) -> Iterable[_AudioChunkLike]: ...
 
 
-class _OutputStreamLike(Protocol):
-    def start(self) -> None: ...
-
-    def write(self, data: NDArray[np.int16]) -> None: ...
-
-    def stop(self) -> None: ...
-
-    def close(self) -> None: ...
-
-
 # Service to create unique filenames from base name, suffix and counter if needed
 def setup_output_filename(
     base_path: str | PathLike[str],
@@ -93,33 +87,18 @@ def synthesize_voice_and_save(
 ) -> None:
     """Synthesizes text to audio, saves it and plays."""
     # Create a Piper object
-    voice = cast(_PiperVoiceLike, PiperVoice.load(os.fspath(model_path)))
+    voice = cast("_PiperVoiceLike", cast(object, PiperVoice.load(os.fspath(model_path))))
 
-    with wave.open(os.fspath(output_file), "wb") as wav_file:
-        voice.synthesize_wav(text=text, wav_file=wav_file, set_wav_format=True, syn_config=syn_config)
-
-    # Lecture du fichier généré
-    # data, fs = sf.read(output_file, dtype='int16')
-    # sd.play(data, fs)
-    # sd.wait()
-    # #sd.sleep(100)  # Pause to ensure playback completes
-    # sd.stop()
-    # print("Synthesis complete.")
-
-
-def synthesize_voice(model_path: str | PathLike[str], text: str) -> None:
-    """Synthesizes text to audio and plays it."""
-    # Create a Piper object
-    voice = cast(_PiperVoiceLike, PiperVoice.load(os.fspath(model_path)))
-    stream = cast(
-        _OutputStreamLike,
-        sd.OutputStream(samplerate=voice.config.sample_rate, channels=1, dtype="int16"),
+    stream = create_output_stream(
+        rate=voice.config.sample_rate,
+        chunk_frames=512,
     )
-    stream.start()
-    for audio_bytes in voice.synthesize(text):
-        stream.write(audio_bytes.audio_int16_array)
 
-    stream.stop()
+    if stream.start():
+        for audio_chunk in voice.synthesize(text):
+            stream.write(audio_chunk.audio_int16_array)
+        stream.stop()
+
     stream.close()
 
 
@@ -133,7 +112,6 @@ def main() -> None:
     text_fr += " J'espère que vous apprécierez cette démonstration."
     file_fr = setup_output_filename(DATA_DIR, TEST_FILE_NAME, model_fr.split("/")[-1].replace(".onnx", ""))
     synthesize_voice_and_save(model_fr, text_fr, file_fr)
-    synthesize_voice(model_fr, text_fr)
     # Example for the English (GB) voice
     model_en = os.path.join(MODEL_DIR, "jarvis-medium.onnx")
     # text_en = "This is a test in British English using the Piper engine."
@@ -142,7 +120,6 @@ def main() -> None:
     text_en += " I hope you will enjoy this demonstration."
     file_en = setup_output_filename(DATA_DIR, TEST_FILE_NAME, model_en.split("/")[-1].replace(".onnx", ""))
     synthesize_voice_and_save(model_en, text_en, file_en)
-    synthesize_voice(model_en, text_en)
 
 
 if __name__ == "__main__":

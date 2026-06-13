@@ -7,222 +7,143 @@ Validates codec configuration and frame buffer sizing.
 Run with:
   python examples/test_stream_open_close.py
 """
-import pyaudio
+
+import logging
 import sys
 from pathlib import Path
+
+import numpy as np
 
 # Ensure repo root is accessible
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from src.audio.audio_utils import (
+    open_input_stream_with_fallback,
+    create_input_stream,
+    create_output_stream,
+    get_audio_backend,
+    get_chunk_frames,
+    get_default_input_device,
+    get_default_output_device,
+)
 from src.utils.config import load_config
 
+app_name = 'test_stream_open_close'
+logger = logging.getLogger(app_name)
 
-def get_first_input_device():
-    """Get first available input device index."""
-    pa: PyAudio = pyaudio.PyAudio()
-    try:
-        for idx in range(pa.get_device_count()):
-            info = pa.get_device_info_by_index(idx)
-            max_input = info.get("maxInputChannels", 0)
-            if max_input and max_input > 0:
-                return idx
-    finally:
-        pa.terminate()
-    return None
-
-
-def get_first_output_device():
-    """Get first available output device index."""
-    pa: PyAudio = pyaudio.PyAudio()
-    try:
-        for idx in range(pa.get_device_count()):
-            info = pa.get_device_info_by_index(idx)
-            max_output = info.get("maxOutputChannels", 0)
-            if max_output and max_output > 0:
-                return idx
-    finally:
-        pa.terminate()
-    return None
-
-
-def test_input_stream_open_close():
+def test_input_stream_open_close() -> bool | None:
     """Test opening and closing an input stream."""
-    print("\n" + "=" * 60)
-    print("TEST: Input Stream Open/Close")
-    print("=" * 60)
+    config = load_config()
+    _ = get_audio_backend()
+    device = get_default_input_device()
 
-    config: Config = load_config()
-    device_idx: int | None = get_first_input_device()
-
-    if device_idx is None:
-        print("⊘ SKIPPED: No input device available")
-        return True
+    if device is None:
+        return False
 
     # Try common sample rates for input
     sample_rate = None
-    for sr in [16000, 44100, 48000]:
+    stream_opened = None
+    for sr in [44100, 48000, 22050, 16000, 8000]:
         try:
-            pa = pyaudio.PyAudio()
-            stream = pa.open(
-                format=pyaudio.paInt16,
-                channels=1,
+            stream_opened = open_input_stream_with_fallback(
                 rate=sr,
-                input=True,
-                frames_per_buffer=512,
-                input_device_index=device_idx,
+                chunk_ms=config.audio.input_chunk_ms,
+                device_index=device,
             )
-            stream.close()
-            pa.terminate()
-            sample_rate = sr
-            break
-        except (OSError, ValueError):
-            pa.terminate()
+            if stream_opened and stream_opened.stream.start():
+                stream_opened.stream.close()
+                sample_rate = sr
+                break
+        except (OSError, ValueError, ImportError):
             continue
-
     if sample_rate is None:
-        print(f"⊘ SKIPPED: No supported sample rate found for device {device_idx}")
-        return True
+        return False
 
-    channels = 1
-    frames_per_buffer = int(sample_rate * config.audio.input_chunk_ms / 1000)
+    chunk_frames = get_chunk_frames(sample_rate, config.audio.input_chunk_ms)
 
-    print(f"Device index: {device_idx}")
-    print(f"Sample rate: {sample_rate} Hz")
-    print(f"Channels: {channels}")
-    print(f"Frames per buffer: {frames_per_buffer}")
-
-    pa = pyaudio.PyAudio()
     stream = None
     try:
         # Open stream
-        print("\nOpening input stream...", end=" ", flush=True)
-        stream = pa.open(
-            format=pyaudio.paInt16,
-            channels=channels,
+        stream = create_input_stream(
             rate=sample_rate,
-            input=True,
-            frames_per_buffer=frames_per_buffer,
-            input_device_index=device_idx,
+            chunk_frames=chunk_frames,
+            device_index=device,
         )
-        print("✓")
+        success = stream.start()
+        assert success, "Failed to start stream"
 
         # Verify stream is active
-        print("Verifying stream is active...", end=" ", flush=True)
-        assert stream.is_active(), "Stream is not active"
-        print("✓")
+        assert stream.active, "Stream is not active"
 
         # Read one chunk
-        print("Reading one audio chunk...", end=" ", flush=True)
-        data = stream.read(frames_per_buffer, exception_on_overflow=False)
-        assert len(data) > 0, "No data read from stream"
-        print(f"✓ ({len(data)} bytes)")
+        data = stream.read(chunk_frames)
+        assert data is not None, "No data read from stream"
+        assert len(data) > 0, "Empty data read from stream"
 
         # Stop stream
-        print("Stopping stream...", end=" ", flush=True)
-        stream.stop_stream()
-        print("✓")
+        stream.stop()
 
         # Verify stream is stopped
-        print("Verifying stream is stopped...", end=" ", flush=True)
-        assert not stream.is_active(), "Stream is still active after stop"
-        print("✓")
+        assert not stream.active, "Stream is still active after stop"
 
-        print("\n✓ PASSED: Input stream open/close successful")
         return True
 
-    except Exception as e:
-        print(f"\n✗ FAILED: {e}")
+    except Exception:
         return False
     finally:
         if stream:
-            try:
-                stream.close()
-            except OSError:
-                pass
-        pa.terminate()
+            stream.close()
 
 
-def test_output_stream_open_close():
+def test_output_stream_open_close() -> bool | None:
     """Test opening and closing an output stream."""
-    print("\n" + "=" * 60)
-    print("TEST: Output Stream Open/Close")
-    print("=" * 60)
+    _ = load_config()
+    _ = get_audio_backend()
+    device = get_default_output_device()
 
-    device_idx = get_first_output_device()
+    if device is None:
+        return False
 
-    if device_idx is None:
-        print("⊘ SKIPPED: No output device available")
-        return True
+    sample_rate = 44100
+    chunk_frames = 512
 
-    sample_rate = 16000
-    channels = 1
-    frames_per_buffer = 512
-
-    print(f"Device index: {device_idx}")
-    print(f"Sample rate: {sample_rate} Hz")
-    print(f"Channels: {channels}")
-    print(f"Frames per buffer: {frames_per_buffer}")
-
-    pa = pyaudio.PyAudio()
     stream = None
     try:
         # Open stream
-        print("\nOpening output stream...", end=" ", flush=True)
-        stream = pa.open(
-            format=pyaudio.paFloat32,
-            channels=channels,
+        stream = create_output_stream(
             rate=sample_rate,
-            output=True,
-            frames_per_buffer=frames_per_buffer,
-            output_device_index=device_idx,
+            chunk_frames=chunk_frames,
+            device_index=device,
         )
-        print("✓")
+        success = stream.start()
+        assert success, "Failed to start stream"
 
         # Verify stream is active
-        print("Verifying stream is active...", end=" ", flush=True)
-        assert stream.is_active(), "Stream is not active"
-        print("✓")
+        assert stream.active, "Stream is not active"
 
         # Write silence
-        import numpy as np
-        print("Writing silence chunk...", end=" ", flush=True)
-        silence = np.zeros(frames_per_buffer, dtype=np.float32).tobytes()
+        silence = np.zeros(chunk_frames, dtype=np.float32)
         stream.write(silence)
-        print("✓")
 
         # Stop stream
-        print("Stopping stream...", end=" ", flush=True)
-        stream.stop_stream()
-        print("✓")
+        stream.stop()
 
         # Verify stream is stopped
-        print("Verifying stream is stopped...", end=" ", flush=True)
-        assert not stream.is_active(), "Stream is still active after stop"
-        print("✓")
+        assert not stream.active, "Stream is still active after stop"
 
-        print("\n✓ PASSED: Output stream open/close successful")
         return True
 
-    except Exception as e:
-        print(f"\n✗ FAILED: {e}")
+    except Exception:
         return False
     finally:
         if stream:
-            try:
-                stream.close()
-            except OSError:
-                pass
-        pa.terminate()
+            stream.close()
 
 
 if __name__ == "__main__":
     success1 = test_input_stream_open_close()
     success2 = test_output_stream_open_close()
 
-    print("\n" + "=" * 60)
-    print("SUMMARY")
-    print("=" * 60)
     all_passed = success1 and success2
-    print(f"Overall: {'✓ PASSED' if all_passed else '✗ FAILED'}")
-
+    logger.info(f"Stream open/close test {'passed' if all_passed else 'failed'}")
     sys.exit(0 if all_passed else 1)

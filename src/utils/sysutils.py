@@ -4,23 +4,22 @@ import logging
 import os
 import pathlib
 import time
-from typing import TYPE_CHECKING, cast
 
 import psutil
 
-if TYPE_CHECKING:
-    from psutil._ntuples import svmem
-
-logger = logging.getLogger(name=__name__)
+module_name = __name__
+lib_name = module_name.split(".")[1]
+logger = logging.getLogger(lib_name)
 
 
 # Utility function to display CPU/RAM usage
 def print_sys_usage(_step: str) -> None:
     """Print system usage statistics."""
     cpu: float = psutil.cpu_percent(interval=0.5)
-    vm: svmem = psutil.virtual_memory()
-    used_gb = cast("float", vm.used) / 1024**3
-    total_gb = cast("float", vm.total) / 1024**3
+    # virtual_memory returns a namedtuple
+    vm = psutil.virtual_memory()
+    used_gb = float(vm.used) / 1024**3  # pyright: ignore[reportAny]
+    total_gb = float(vm.total) / 1024**3  # pyright: ignore[reportAny]
     logger.info("%s: CPU=%.1f%% RAM=%.2f/%.2f GB", _step, cpu, used_gb, total_gb)
 
 

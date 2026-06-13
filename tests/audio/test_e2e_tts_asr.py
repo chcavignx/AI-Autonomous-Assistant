@@ -31,13 +31,14 @@ def test_tts_to_wav_to_asr_transcription(tmp_path):
             wav_file=wf,
             set_wav_format=True,
         )
+    tts.unload()
 
     # Load only STT model (avoid VAD download).
     asr = ASREngine(config)
-    asr._configure_torch_runtime()
-    asr._load_stt_model()
+    asr.load()
     assert asr._stt_model is not None
 
     text = asr.transcribe_file(str(wav_path)).lower()
     text = re.sub(r"[^a-z\s]", " ", text)
+    asr.unload()
     assert "hello" in text or "world" in text

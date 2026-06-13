@@ -11,46 +11,66 @@ paths:
 tts:
   engine: "piper"
   model_name: "jarvis-medium.onnx"
-  # model_path: null  # Let Python code build the path dynamically
+  model_path: Null # Let Python code build the path dynamically
   cli_mode: false
+  device: "cpu"
+  length_scale: 1.0
+  noise_scale: 1.0
+  noise_w_scale: 1.0
+  normalize_audio: true
   speed: 1.0
-  volume: 1.0
+  volume: 0.5
 
 vad:
-  min_speech_duration_ms: 250
+  min_speech_duration_ms: 100
   min_silence_duration_ms: 500
-  silence_timeout_seconds: 3
-  max_recording_seconds: 10
-  threshold: 0.5
+  silence_timeout_seconds: 1
+  max_recording_seconds: 15
+  threshold: 0.6
+  sample_rate: 44100
 
 # Automatic Speech Recognition (ASR) configuration
 asr:
   engine: "faster-whisper" # "whisper", "faster-whisper"
   model_size: "tiny"
+  faster_model_size: "small"
   language: "en"
   translate: false
-  transformers: false
+  transformers: true
   transformers_engine: "huggingface" # "huggingface" or "onnxruntime"
   device: "cpu"  # Pi5 : CPU (or "hailo")
   compute_type: "int8"
-  skip_native_teardown: true  # Avoid native teardown segfaults on some ARM/PortAudio stacks
-  # download_root: null  # Let Python code build the path dynamically
+  download_root: null  # Let Python code build the path dynamically
+  skip_native_teardown: false  # Avoid native teardown segfaults on some ARM/PortAudio stacks
+  store_audio: true
+  store_audio_path: ".tmp/asr.wav"
+
 
 wake:
   wake_word: "hey_jarvis"
-  model_name: "hey_jarvis_v0.1"
+  model_name: "embedding_model"
+  model_path: null
   inference_framework: "onnx"
-  threshold: 0.5
+  threshold: 0.4
   cooldown_seconds: 2.0
   noise_suppression: true
+  download_root: null
+  vad_threshold: 0.6
 
 audio:
-  input_sample_rate: 44100
+  input_sample_rate: 48000
   input_chunk_ms: 30  # taille des chunks audio en ms
-  input_chunk_size: 300
-  input_device_index: 2 # No input-capable PyAudio device detected on this machine; use system default when a mic is attached
-  volume: 0.8  # half as loud
-  output_device_index: 0 # PyAudio output device: USB PnP Audio Device: Audio (hw:3,0)
+  input_chunk_size: 500
+  input_device_index: 0 # use system default when a mic is attached
+  input_device_name: 'USB ENC Audio Device'  # Optional name of input device to select (overrides index if found)
+  volume: 0.5  # half as loud
+  output_device_index: 1 # default to USB PnP Audio Device: Audio (hw:3,0)
   output_sample_rate: 44100
   output_chunk_ms: 30  # taille des chunks audio en ms
   output_chunk_size: 500
+  output_device_name: 'USB PnP Audio Device'  # Optional name of output device to select (overrides index if found)
+
+# Platform-specific configuration
+platform:
+  cpu_cores: 2  # Limit CPU cores for multiprocessing on Pi5
+  pi: false  # Automatically detect Raspberry Pi and apply tuning
