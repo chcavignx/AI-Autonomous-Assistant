@@ -171,12 +171,17 @@ The library exposes three main components that map directly to the recommended a
 
 ### Wake Word Detection
 
-`WakeWordDetector` uses **openWakeWord**:
+`WakeWordDetector` is implemented by directly running pre-trained openWakeWord ONNX models using `onnxruntime`, bypassing the standard `openwakeword` Python package (which has compatibility issues with newer Python versions).
 
-- Runs fully offline
-- Captures microphone input with PyAudio
-- Expects 16 kHz audio internally, resamples device audio when necessary
-- Uses a cooldown to avoid repeated triggers
+Key Details:
+
+- Model designs and weights are derived from [openWakeWord](https://github.com/dscripka/openWakeWord.git).
+- Audio feature extraction (log-mel spectrogram and Google speech embeddings) is handled directly via `ONNXAudioFeatures` to reproduce openWakeWord's preprocessing pipeline.
+- Performs inference using three chained ONNX sessions: `melspectrogram.onnx`, `embedding_model.onnx`, and the wake word classifier `.onnx` model.
+- Runs fully offline.
+- Captures microphone input with PyAudio.
+- Expects 16 kHz audio internally, resampling device audio when necessary.
+- Uses a cooldown to avoid repeated triggers.
 
 ### Speech Recognition
 
