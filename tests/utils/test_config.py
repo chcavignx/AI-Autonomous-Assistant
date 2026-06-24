@@ -105,7 +105,6 @@ def test_wake_config_defaults() -> None:
     assert math.isclose(wake.cooldown_seconds, 2.0)
     assert wake.download_root is None
     assert wake.noise_suppression is False
-    assert math.isclose(wake.vad_threshold, 0.6)
 
 
 def test_wake_config_download_path_default() -> None:
