@@ -53,6 +53,11 @@ class PathConfig(BaseModel):
         """Returns the path to the models directory."""
         return self.cache_path / "audio" / self.models
 
+    @property
+    def tmp_path(self) -> Path:
+        """Returns the path to the tmp directory."""
+        return ROOT_DIR / self.tmp
+
 
 class ASRConfig(PathConfig):
     """Configuration for ASR (Automatic Speech Recognition / Speech-to-Text) settings."""
@@ -76,10 +81,9 @@ class ASRConfig(PathConfig):
         """Returns the download path for the ASR model."""
         if self.download_root:
             p = ROOT_DIR / self.download_root
-            # Avoid doubling engine name if already in path
             if p.name == self.engine:
-                return p
-            return p / self.engine
+                return p.resolve()
+            return (p / self.engine).resolve()
         return self.models_audio_path / (self.transformers_engine if self.transformers else self.engine)
 
     @property
@@ -109,9 +113,9 @@ class TTSConfig(PathConfig):
         if self.model_path:
             p = ROOT_DIR / self.model_path
             # If it's already a file path, return it
-            if p.suffix in {".onnx", ".bin", ".pt"}:
-                return p
-            return p / self.engine / self.model_name
+            if p.suffix in {".onnx", ".bin", ".pt", ".tflite"}:
+                return p.resolve()
+            return (p / self.engine / self.model_name).resolve()
         return self.models_audio_path / self.engine / self.model_name
 
 
@@ -126,23 +130,37 @@ class WakeConfig(PathConfig):
     cooldown_seconds: float = 2.0  # minimum seconds between detections
     download_root: str | None = None
     noise_suppression: bool = False
-    vad_threshold: float = 0.6
+    melspec_model: str = "melspectrogram"
+    embedding_model: str = "embedding_model"
+    silero_vad_model: str = "silero_vad"
+    backend: str = "wakeword"
 
     @property
     def download_path(self) -> Path:
-        """Returns the download path for the ASR model."""
+        """Returns the download path for the wakeword model."""
         if self.download_root:
-            p = ROOT_DIR / self.download_root
-            # Avoid doubling engine name if already in path
-            if p.suffix in {".onnx", ".tflite"}:
-                return p
-            return p / "wakeword"
+            return (ROOT_DIR / self.download_root).resolve()
         return self.models_audio_path / "wakeword"
 
     @property
     def full_model_path(self) -> Path:
         """Returns the full path to the wakeword model."""
         return self.download_path / f"{self.model_name}.{self.inference_framework}"
+
+    @property
+    def embedding_model_path(self) -> Path:
+        """Returns the full path to the embedding model."""
+        return self.download_path / f"{self.embedding_model}.{self.inference_framework}"
+
+    @property
+    def melspec_model_path(self) -> Path:
+        """Returns the full path to the melspec model."""
+        return self.download_path / f"{self.melspec_model}.{self.inference_framework}"
+
+    @property
+    def silero_vad_model_path(self) -> Path:
+        """Returns the full path to the silero vad model."""
+        return self.download_path / f"{self.silero_vad_model}.{self.inference_framework}"
 
 
 class VADConfig(PathConfig):

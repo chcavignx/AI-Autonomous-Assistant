@@ -133,7 +133,7 @@ requires-dist = [
     { name = "loguru", specifier = ">=0.7.0" },
     { name = "numba", specifier = ">=0.57.0" },
     { name = "numpy", specifier = ">=1.24.0" },
-    { name = "onnxruntime", specifier = ">=1.16.0" },
+    { name = "onnxruntime", specifier = ">=1.18.0" },
     { name = "openai-whisper", git = "https://github.com/openai/whisper.git" },
     { name = "openwakeword", specifier = ">=0.1.0" },
     { name = "piper-tts", specifier = ">=1.4.1" },

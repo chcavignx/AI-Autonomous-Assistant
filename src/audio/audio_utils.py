@@ -83,14 +83,11 @@ class OpenedInputStream:
 
 def get_audio_backend() -> str:
     try:
-        import sounddevice as sd
-        return "sounddevice"
-    except ImportError:
-        raise ImportError(
-            "The 'sounddevice' library is required but not installed.\n \
-            Install it via: pip install sounddevice"
-        )
-
+        import sounddevice
+        _ = sounddevice
+    except ImportError as e:
+        raise ImportError("The 'sounddevice' library is required") from e
+    return "sounddevice"
 
 def is_backend_available(backend: str) -> bool:
     """Check if a specific audio backend is available.

@@ -78,35 +78,45 @@ def test_wake_word_load(monkeypatch: pytest.MonkeyPatch) -> None:
 
         model_file = tmp_path / "mock_model.onnx"
         model_file.touch()
+        melspec_file = tmp_path / "melspec.onnx"
+        melspec_file.touch()
+        embedding_file = tmp_path / "embedding.onnx"
+        embedding_file.touch()
 
         mock_config = MagicMock()
         mock_config.wake.model_name = "mock_model"
         mock_config.wake.full_model_path = model_file
+        mock_config.wake.melspec_model_path = melspec_file
+        mock_config.wake.embedding_model_path = embedding_file
         mock_config.wake.inference_framework = "onnx"
         mock_config.wake.download_path = tmp_path
         mock_config.cpu_cores = 4
 
-        loaded = {}
-
-        def mock_Model(wakeword_models, inference_framework, **kwargs):
-            loaded["wakeword_models"] = wakeword_models
-            loaded["inference_framework"] = inference_framework
-            return "mock_model"
-
-        monkeypatch.setattr("openwakeword.model.Model", mock_Model)
+        mock_ort = MagicMock()
+        mock_session = MagicMock()
+        mock_ort.InferenceSession.return_value = mock_session
+        monkeypatch.setitem(sys.modules, "onnxruntime", mock_ort)
 
         wwd = WakeWordDetector(mock_config)
         wwd.load()
-        assert loaded["wakeword_models"] == [str(model_file)]
-        assert wwd._model == "mock_model"
+        assert wwd._ww_sess == mock_session
 
 
 def test_wake_word_detect_loop(monkeypatch: pytest.MonkeyPatch) -> None:
     config = Config()
     wwd = WakeWordDetector(config)
     wwd._running = True
-    wwd._model = MagicMock()
-    wwd._model.prediction_buffer = {"hey_jarvis": [0.9]}
+
+    mock_ww_sess = MagicMock()
+    mock_input = MagicMock()
+    mock_input.name = "input"
+    mock_ww_sess.get_inputs.return_value = [mock_input]
+    mock_ww_sess.run.return_value = [[[0.9]]]
+
+    wwd._ww_sess = mock_ww_sess
+    wwd._preprocessor = MagicMock()
+    wwd._preprocessor.get_features.return_value = np.zeros((1, 16, 96), dtype=np.float32)
+    wwd._prediction_count = 5
 
     # Mock callback
     callback_called = False

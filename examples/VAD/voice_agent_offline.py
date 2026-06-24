@@ -4,7 +4,7 @@
 Minimal voice agent demonstrating ASR, TTS, and wake-word detection.
 
 Features:
-  - Wake word detection (openWakeWord)
+  - Wake word detection (Direct ONNX Runtime, no openwakeword library package)
   - Speech recognition (Whisper or Faster-Whisper)
   - Text-to-speech synthesis (Piper)
   - Simple intent-based response system
@@ -14,6 +14,7 @@ Usage:
   python examples/simple_voice_agent.py
 """
 
+import datetime
 import logging
 import signal
 import sys
@@ -112,8 +113,15 @@ class SimpleVoiceAgent:
         """Callback when wake word is detected."""
         logger.info("🟣 Wake word detected!")
         self.wake_word_active = True
+
+        # Stop listening during TTS playback to avoid hearing ourselves
+        with self._listener_lock:
+            if self._wake_active:
+                self.wake_detector.stop()
+                self._wake_active = False
+
+        self.tts.speak("Yes? How can I help you?", blocking=True)
         self._ensure_asr_mode()
-        self.tts.speak("Yes? How can I help you?")
 
     def _on_transcript_received(self, transcript: str) -> None:
         """Callback when speech is transcribed."""
@@ -131,11 +139,25 @@ class SimpleVoiceAgent:
         # Process the command
         response = self._generate_response(transcript)
         logger.info("🤖 Response: '%s'", response)
-        self.tts.speak(response)
 
-        self.wake_word_active = False
-        logger.info("🟢 Returning to wake word mode")
-        self._ensure_wake_mode()
+        # Stop listening during TTS playback to avoid hearing ourselves
+        with self._listener_lock:
+            if self._asr_active:
+                self.asr.stop()
+                self._asr_active = False
+
+        self.tts.speak(response, blocking=True)
+
+        # Check if we should continue listening in ASR mode or return to wake word mode
+        should_continue = not any(exit_word in transcript.lower() for exit_word in ["stop", "exit", "quit"])
+
+        if should_continue:
+            logger.info("🟢 Continuing conversation, staying in ASR mode")
+            self._ensure_asr_mode()
+        else:
+            self.wake_word_active = False
+            logger.info("🟢 Returning to wake word mode")
+            self._ensure_wake_mode()
 
     def _ensure_wake_mode(self) -> None:
         """Run wake-word listening without a parallel ASR capture stream."""
@@ -184,13 +206,15 @@ class SimpleVoiceAgent:
 
         # Simple keyword matching
         responses = {
-            "hello": "Hello! What can I do for you?",
-            "hi": "Hi there!",
-            "time": "I don't have real-time capabilities right now.",
-            "weather": "I can't check the weather, but I hope it's nice outside!",
-            "help": "I'm a voice agent. Try saying hello or ask me a question.",
-            "thanks": "You're welcome!",
-            "thank you": "Happy to help!",
+            "hello": f"Hello! I'm {self.config.wake.wake_word}, your AI assistant. How can I help you?",
+            "hi": f"Hi there! What can I do for you?",
+            'time': 'The current time is ' + datetime.datetime.now().strftime("%I:%M %p"),  # Get the current time and format it
+            'date': 'Today, the date is: ' + datetime.datetime.now().strftime("%d %B %Y"),  # Get the current date and format it
+            "lights": f"I would control your lights if I had smart home integration.",
+            "music": f"I would play music if I had access to your media system.",
+            "stop": f"Goodbye! Returning to wake word detection.",
+            "bye_bye": f"See you later! Going back to sleep mode.",
+            "help": f"I can respond to simple commands like hello, hi, time, date, lights, music, stop and bye-bye."
         }
 
         # Match keywords

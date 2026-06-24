@@ -6,7 +6,7 @@
 Automatic Speech Recognition engine combining STT + VAD.
 
 Architecture:
-  1. Microphone -> capture thread (PyAudio or sounddevice chunks)
+  1. Microphone -> capture thread sounddevice chunks
   2. Silero VAD -> detect speech vs silence
   3. Accumulate speech chunks
   4. On silence detected -> STT (Whisper/Faster-Whisper) -> transcript
@@ -284,6 +284,13 @@ class ASREngine:
 
         self._transcript_callback = callback
         self._running = True
+
+        # Clear the queue of any leftover items (including None sentinel)
+        while not self._audio_queue.empty():
+            try:
+                _ = self._audio_queue.get_nowait()
+            except queue.Empty:
+                break
 
         if not self._open_input_stream():
             self._running = False

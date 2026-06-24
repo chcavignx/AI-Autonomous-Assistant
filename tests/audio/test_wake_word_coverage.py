@@ -14,34 +14,29 @@ from src.utils.config import Config
 pytestmark = pytest.mark.basic
 
 
-def test_load_import_error_when_openwakeword_missing(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test that load() raises ImportError when openwakeword is not installed."""
-    monkeypatch.delitem(sys.modules, "openwakeword", raising=False)
-    monkeypatch.delitem(sys.modules, "openwakeword.model", raising=False)
+def test_load_import_error_when_onnxruntime_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that load() raises ImportError when onnxruntime is not installed."""
+    monkeypatch.delitem(sys.modules, "onnxruntime", raising=False)
 
     original_import = __import__
 
     def fake_import(name: str, *args, **kwargs):
-        if name.startswith("openwakeword"):
+        if name.startswith("onnxruntime"):
             msg = f"No module named '{name}'"
             raise ImportError(msg)
         return original_import(name, *args, **kwargs)
 
     monkeypatch.setattr("builtins.__import__", fake_import)
+    monkeypatch.setattr("pathlib.Path.is_file", lambda self: True)
 
     config = Config()
     wwd = WakeWordDetector(config)
-    with pytest.raises(ImportError, match="openwakeword not installed"):
+    with pytest.raises(ImportError, match="onnxruntime not installed"):
         wwd.load()
 
 
-def test_load_file_not_found_when_model_missing(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_load_file_not_found_when_model_missing(tmp_path) -> None:
     """Test that load() raises FileNotFoundError when model file doesn't exist."""
-    mock_oww = MagicMock()
-    mock_oww_model = MagicMock()
-    monkeypatch.setitem(sys.modules, "openwakeword", mock_oww)
-    monkeypatch.setitem(sys.modules, "openwakeword.model", mock_oww_model)
-
     config = Config()
     config.wake.model_name = "nonexistent_model"
     config.wake.download_root = str(tmp_path)
@@ -51,16 +46,16 @@ def test_load_file_not_found_when_model_missing(monkeypatch: pytest.MonkeyPatch,
         wwd.load()
 
 
-def test_unload_clears_model_and_stops() -> None:
-    """Test that unload() clears the model and stops the wwd."""
+def test_unload_clears_sessions_and_stops() -> None:
+    """Test that unload() clears the sessions and stops the wwd."""
     config = Config()
     wwd = WakeWordDetector(config)
-    wwd._model = MagicMock()
+    wwd._ww_sess = MagicMock()
     wwd._running = True
 
     wwd.unload()
 
-    assert wwd._model is None
+    assert wwd._ww_sess is None
     assert wwd._running is False
 
 
@@ -294,9 +289,16 @@ def test_detect_loop_queue_empty_then_sentinel() -> None:
     config = Config()
     wwd = WakeWordDetector(config)
     wwd._running = True
-    wwd._model = MagicMock()
-    wwd._model.predict = MagicMock(return_value=None)
-    wwd._model.prediction_buffer = {"hey_jarvis": [0.3]}  # Below threshold
+
+    mock_ww_sess = MagicMock()
+    mock_input = MagicMock()
+    mock_input.name = "input"
+    mock_ww_sess.get_inputs.return_value = [mock_input]
+    mock_ww_sess.run.return_value = [[[0.3]]]
+
+    wwd._ww_sess = mock_ww_sess
+    wwd._preprocessor = MagicMock()
+    wwd._preprocessor.get_features.return_value = np.zeros((1, 16, 96), dtype=np.float32)
 
     # Put one item then sentinel - the queue timeout (line 321-322) fires
     # before the item is consumed because get(timeout=0.2) blocks briefly
@@ -306,15 +308,15 @@ def test_detect_loop_queue_empty_then_sentinel() -> None:
     wwd._detect_loop()
 
     # If we get here, the loop exited cleanly
-    wwd._model.predict.assert_called()
+    wwd._ww_sess.run.assert_called()
 
 
 def test_detect_loop_no_model_continues() -> None:
-    """Test that _detect_loop continues when model is None (line 329)."""
+    """Test that _detect_loop continues when _ww_sess is None."""
     config = Config()
     wwd = WakeWordDetector(config)
     wwd._running = True
-    wwd._model = None
+    wwd._ww_sess = None
 
     wwd._audio_queue.put(np.ones(1280, dtype=np.float32))
     wwd._audio_queue.put(None)  # sentinel
@@ -324,14 +326,20 @@ def test_detect_loop_no_model_continues() -> None:
 
 
 def test_detect_loop_prediction_error_handling() -> None:
-    """Test that _detect_loop handles prediction errors gracefully (line 347-348)."""
+    """Test that _detect_loop handles prediction errors gracefully."""
     config = Config()
     wwd = WakeWordDetector(config)
     wwd._running = True
 
-    mock_model = MagicMock()
-    mock_model.predict.side_effect = RuntimeError("prediction failed")
-    wwd._model = mock_model
+    mock_ww_sess = MagicMock()
+    mock_input = MagicMock()
+    mock_input.name = "input"
+    mock_ww_sess.get_inputs.return_value = [mock_input]
+    mock_ww_sess.run.side_effect = RuntimeError("prediction failed")
+
+    wwd._ww_sess = mock_ww_sess
+    wwd._preprocessor = MagicMock()
+    wwd._preprocessor.get_features.return_value = np.zeros((1, 16, 96), dtype=np.float32)
 
     wwd._audio_queue.put(np.ones(1280, dtype=np.float32))
     wwd._audio_queue.put(None)  # sentinel

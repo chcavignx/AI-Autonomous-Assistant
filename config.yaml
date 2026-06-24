@@ -40,34 +40,34 @@ asr:
   transformers_engine: "huggingface" # "huggingface" or "onnxruntime"
   device: "cpu"  # Pi5 : CPU (or "hailo")
   compute_type: "int8"
-  download_root: null  # Let Python code build the path dynamically
+  download_root: null # Let Python code build the path dynamically
   skip_native_teardown: false  # Avoid native teardown segfaults on some ARM/PortAudio stacks
   store_audio: true
   store_audio_path: ".tmp/asr.wav"
 
 
 wake:
-  wake_word: "hey_jarvis"
-  model_name: "embedding_model"
+  wake_word: "hello_jarvis"
+  backend: "wakeword"
+  model_name: "hey_jarvis_v0.1"
   model_path: null
   inference_framework: "onnx"
   threshold: 0.4
   cooldown_seconds: 2.0
   noise_suppression: true
-  download_root: null
-  vad_threshold: 0.6
+  download_root: ".cache/audio/models/wakeword"
 
 audio:
   input_sample_rate: 48000
-  input_chunk_ms: 30  # taille des chunks audio en ms
-  input_chunk_size: 500
+  input_chunk_ms: 300  # taille des chunks audio en ms
+  input_chunk_size: 1024
   input_device_index: 0 # use system default when a mic is attached
   input_device_name: 'USB ENC Audio Device'  # Optional name of input device to select (overrides index if found)
   volume: 0.5  # half as loud
   output_device_index: 1 # default to USB PnP Audio Device: Audio (hw:3,0)
   output_sample_rate: 44100
-  output_chunk_ms: 30  # taille des chunks audio en ms
-  output_chunk_size: 500
+  output_chunk_ms: 300  # taille des chunks audio en ms
+  output_chunk_size: 1024
   output_device_name: 'USB PnP Audio Device'  # Optional name of output device to select (overrides index if found)
 
 # Platform-specific configuration

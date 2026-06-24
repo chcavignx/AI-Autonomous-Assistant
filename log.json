@@ -17,7 +17,7 @@
     "handlers": {
         "stdout": {
             "class": "logging.StreamHandler",
-            "level": "INFO",
+            "level": "WARNING",
             "filters": ["max_warning"],
             "formatter": "simple",
             "stream": "ext://sys.stdout"

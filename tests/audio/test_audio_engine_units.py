@@ -865,30 +865,34 @@ def test_asr_current_import_and_transcribe_paths(monkeypatch) -> None:
     assert asr._extract_text_from_result({"segments": [{"text": "dict"}]}) == "dict"
 
 
-def test_wake_word_current_branches(monkeypatch, tmp_path) -> None:
-    # Create mock openwakeword module to avoid test contamination
-    mock_oww = MagicMock()
-    mock_oww_model = MagicMock()
-    monkeypatch.setitem(sys.modules, "openwakeword", mock_oww)
-    monkeypatch.setitem(sys.modules, "openwakeword.model", mock_oww_model)
-
+def test_wake_word_load_and_stream(monkeypatch) -> None:
     from src.audio import wake_word as wake_word_module
 
+    config = Config()
+    tmp_path = config.paths.tmp_path
+
     model_path = tmp_path / "wake.onnx"
-    model_dir = tmp_path / "wakeword"
-    model_dir.mkdir()
-    model_path = model_dir / "wake.onnx"
     model_path.write_text("dummy")
+    melspec_path = tmp_path / "melspec.onnx"
+    melspec_path.write_text("dummy")
+    embedding_path = tmp_path / "embedding.onnx"
+    embedding_path.write_text("dummy")
+
     config = Config()
     config.wake.model_name = "wake"
     config.wake.download_root = str(tmp_path)
-    detector = wake_word_module.WakeWordDetector(config)
+    config.wake.melspec_model = "melspec"
+    config.wake.embedding_model = "embedding"
+    config.wake.inference_framework = "onnx"
 
-    monkeypatch.setattr(
-        "openwakeword.model.Model", lambda **kwargs: MagicMock(prediction_buffer={"hey_jarvis": [0.95]})
-    )
+    mock_ort = MagicMock()
+    mock_session = MagicMock()
+    mock_ort.InferenceSession.return_value = mock_session
+    monkeypatch.setitem(sys.modules, "onnxruntime", mock_ort)
+
+    detector = wake_word_module.WakeWordDetector(config)
     detector.load()
-    assert detector._model is not None
+    assert detector._ww_sess is not None
 
     monkeypatch.setattr(
         "src.audio.wake_word.open_input_stream_with_fallback",
@@ -912,6 +916,13 @@ def test_wake_word_current_branches(monkeypatch, tmp_path) -> None:
         lambda **kwargs: DummyOpened(),
     )
     assert detector._open_input_stream() is True
+
+
+def test_wake_word_loops(monkeypatch) -> None:
+    from src.audio import wake_word as wake_word_module
+
+    config = Config()
+    detector = wake_word_module.WakeWordDetector(config)
 
     class DummyQueue:
         def __init__(self) -> None:
@@ -945,8 +956,18 @@ def test_wake_word_current_branches(monkeypatch, tmp_path) -> None:
     detector._audio_queue = queue.Queue()
     detector._audio_queue.put(np.ones(1280, dtype=np.float32))
     detector._audio_queue.put(None)
-    detector._model = MagicMock()
-    detector._model.prediction_buffer = {"hey_jarvis": [0.95]}
+
+    mock_ww_sess = MagicMock()
+    mock_input = MagicMock()
+    mock_input.name = "input"
+    mock_ww_sess.get_inputs.return_value = [mock_input]
+    mock_ww_sess.run.return_value = [[[0.95]]]
+
+    detector._ww_sess = mock_ww_sess
+    detector._preprocessor = MagicMock()
+    detector._preprocessor.get_features.return_value = np.zeros((1, 16, 96), dtype=np.float32)
+    detector._prediction_count = 5
+
     callback_calls: list[str] = []
     detector._callback = lambda: callback_calls.append("hit")
     monkeypatch.setattr("time.time", lambda: 100.0)
