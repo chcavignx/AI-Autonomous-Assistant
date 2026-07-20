@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 
 # Ensure repo root is accessible
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.audio.wake_word import WakeWordDetector
 from src.utils.config import load_config

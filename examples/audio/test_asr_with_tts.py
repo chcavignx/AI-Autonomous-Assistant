@@ -8,7 +8,7 @@ This validates the complete ASR+TTS integration flow by:
 4. Comparing the result to the original text
 
 Run with:
-  python examples/test_asr_with_tts_integration.py
+  python examples/audio/test_asr_with_tts.py
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ import tempfile
 from pathlib import Path
 
 # Ensure repo root is accessible BEFORE any src.* imports
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.audio.asr import ASREngine
 from src.audio.tts import TTSEngine

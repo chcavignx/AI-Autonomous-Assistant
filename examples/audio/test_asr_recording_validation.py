@@ -19,7 +19,7 @@ import wave
 from pathlib import Path
 
 # Ensure repo root is accessible
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.audio.asr import ASREngine
 from src.utils.config import load_config
@@ -36,7 +36,7 @@ def test_asr_recording() -> bool:
     # 2. Resolve the store_audio_path - ASREngine writes captured audio here
     store_path = Path(config.asr.store_audio_path)
     if not store_path.is_absolute():
-        store_path = Path(__file__).resolve().parent.parent / store_path
+        store_path = Path(__file__).resolve().parent.parent.parent / store_path
 
     # Remove any stale file from a previous run so we can detect a fresh write
     if store_path.exists():

@@ -11,6 +11,6 @@ class MaxLevelFilter(logging.Filter):
         self.max_level: int = getattr(logging, max_level)
         super().__init__()
 
-    def filter(self, record: logging.LogRecord) -> bool:  # pyright: ignore[reportImplicitOverride]
+    def filter(self, record: logging.LogRecord) -> bool:
         """Return True only if the record's level is below max_level."""
         return record.levelno <= self.max_level

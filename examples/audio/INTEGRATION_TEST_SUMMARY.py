@@ -4,29 +4,47 @@
 ║                          Summary Report                                      ║
 ╚══════════════════════════════════════════════════════════════════════════════╝.
 
-Created: April 15, 2026
-Location: examples/
+Created: April 15, 2026 (Updated: June 25, 2026)
+Location: examples/audio/
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📦 DELIVERABLES (5 test files + 1 runner + 1 guide)
+📦 DELIVERABLES (10 test files + 1 runner + 1 guide)
 
-  ✓ test_hardware_detection.py   (2.5 KB)
+  ✓ test_hardware_detection.py   (1.5 KB)
     └─ Detects audio devices, lists capabilities
 
-  ✓ test_stream_open_close.py    (6.5 KB)
+  ✓ test_stream_open_close.py    (4.0 KB)
     └─ Opens/closes input & output streams, validates state
 
-  ✓ test_playback.py             (5.3 KB)
+  ✓ test_playback.py             (4.4 KB)
     └─ Generates 440Hz sine wave, tests playback & silence
 
-  ✓ test_recording.py            (7.5 KB)
+  ✓ test_recording.py            (3.5 KB)
     └─ Records from mic, saves WAV, re-plays recording
 
-  ✓ run_all_audio_tests.py       (2.1 KB)
-    └─ Orchestrates all 4 tests with summary
+  ✓ test_recorder_standalone.py  (2.6 KB)
+    └─ Validates simplified AudioRecorder PCM/float capture
 
-  ✓ AUDIO_TESTS_README.md        (6.0 KB)
+  ✓ test_asr_with_tts.py         (3.9 KB)
+    └─ Loopback transcription testing ASR+TTS engines
+
+  ✓ test_asr_recording_validation.py (3.8 KB)
+    └─ Validates mic recording and WAV file structure
+
+  ✓ test_wake_word_standalone.py (1.4 KB)
+    └─ Tests openWakeWord background thread detection
+
+  ✓ test_vad_standalone.py       (2.9 KB)
+    └─ Tests standalone Silero VAD and resampling utilities
+
+  ✓ test_tts_lifecycle_and_utils.py (5.6 KB)
+    └─ Non-blocking TTS lifecycle, interruption, and utility verification
+
+  ✓ run_all_audio_tests.py       (2.2 KB)
+    └─ Orchestrates all 10 tests with summary
+
+  ✓ AUDIO_TESTS_README.md        (10.1 KB)
     └─ Complete documentation for all tests
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -35,35 +53,52 @@ Location: examples/
 
   [1] Hardware Detection     ✓ PASSED
       → Can we find audio devices?
-      → Lists: 4 devices (3 input-capable, 3 output-capable)
 
   [2] Stream Open/Close     ✓ PASSED
       → Can we open streams without errors?
-      → Validates state: active → stop → inactive
-      → Smart sample rate negotiation (48kHz input, 16kHz output)
 
   [3] Playback              ✓ PASSED
       → Can we send data to speakers?
-      → Tests 440Hz sine wave (2s) + silence (1s)
-      → Validates write-to-stream works
 
   [4] Recording             ✓ PASSED
       → Can we capture from microphone?
-      → Records 2s + 1s audio chunks
-      → Validates WAV file creation & playback
+
+  [5] Recorder Standalone    ✓ PASSED
+      → Can we start/stop and read numpy/float audio frames?
+
+  [6] ASR with TTS          ✓ PASSED
+      → Does the Piper-to-Whisper loopback match transcription?
+
+  [7] ASR Recording Validation ✓ PASSED
+      → Does ASR capture correct WAV files from the microphone?
+
+  [8] Wake Word Standalone   ✓ PASSED
+      → Does the background wake word detector run and load models?
+
+  [9] VAD Standalone Flow    ✓ PASSED
+      → Does Silero VAD classify speech and resampling operate correctly?
+
+  [10] TTS Lifecycle & Utils ✓ PASSED
+      → Does non-blocking TTS handle speak/interrupt/wait/unload correctly?
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🏃 QUICK START
 
-  # Run all tests at once
-  python examples/run_all_audio_tests.py
+  # Run all tests at once (using the workspace virtual environment)
+  .venv/bin/python examples/audio/run_all_audio_tests.py
 
-  # Run individual test
-  python examples/test_hardware_detection.py
-  python examples/test_stream_open_close.py
-  python examples/test_playback.py
-  python examples/test_recording.py
+  # Run individual tests
+  .venv/bin/python examples/audio/test_hardware_detection.py
+  .venv/bin/python examples/audio/test_stream_open_close.py
+  .venv/bin/python examples/audio/test_playback.py
+  .venv/bin/python examples/audio/test_recording.py
+  .venv/bin/python examples/audio/test_recorder_standalone.py
+  .venv/bin/python examples/audio/test_asr_with_tts.py
+  .venv/bin/python examples/audio/test_asr_recording_validation.py
+  .venv/bin/python examples/audio/test_wake_word_standalone.py
+  .venv/bin/python examples/audio/test_vad_standalone.py
+  .venv/bin/python examples/audio/test_tts_lifecycle_and_utils.py
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -81,31 +116,13 @@ Location: examples/
 
 📋 VALIDATION RESULTS (Latest Run)
 
-  Hardware Configuration:
-    • 4 audio devices detected
-    • 3 capable of input (USB ENC, pipewire, default)
-    • 3 capable of output (USB PnP, pipewire, default)
-
-  Stream Test:
-    • Input stream:  48000 Hz, 1-ch, 1440 frames/buffer ✓
-    • Output stream: 16000 Hz, 1-ch, 512 frames/buffer ✓
-
-  Playback Test:
-    • Sine wave (440 Hz, 2s): 32000 samples ✓
-    • Silence (1s): 16000 samples ✓
-
-  Recording Test:
-    • Record duration: 2 seconds ✓
-    • File size: 191532 bytes ✓
-    • Re-play verification: ✓
-
-  OVERALL: 4/4 TESTS PASSED ✓
+  OVERALL: 10/10 TESTS PASSED ✓
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📚 DOCUMENTATION
 
-  See examples/AUDIO_TESTS_README.md for:
+  See examples/audio/AUDIO_TESTS_README.md for:
     • Detailed description of each test
     • Expected outputs
     • Common issues and fixes
@@ -113,14 +130,4 @@ Location: examples/
     • Hardware compatibility info
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🚀 NEXT STEPS
-
-  1. Integrate into deployment health checks
-  2. Add ASR/TTS validation tests (builds on these)
-  3. Extend with performance benchmarks
-  4. CI/CD integration for automated hardware testing
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 """

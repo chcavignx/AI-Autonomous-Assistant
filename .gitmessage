@@ -1,0 +1,11 @@
+# <type>(<scope>): <subject>
+#
+# <body>
+#
+# <footer>
+
+# Type: feat, fix, docs, style, refactor, perf, test, chore, ci
+# Scope: zone affectée (stt, vision, tts, etc.)
+# Subject: description courte en minuscules
+# Body: explication détaillée (optionnel)
+# Footer: issues fermées (optionnel)

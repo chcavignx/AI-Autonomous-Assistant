@@ -49,7 +49,8 @@ def test_asr_extract_text_from_result_variants() -> None:
     assert asr._extract_text_from_result(result=([DummySegment()], None)) == "world"
 
     class DummyResult:
-        segments: list[DummySegment] = [DummySegment()]  # noqa: RUF012
+        def __init__(self) -> None:
+            self.segments: list[DummySegment] = [DummySegment()]
 
     assert asr._extract_text_from_result(result=DummyResult()) == "world"
     assert asr._extract_text_from_result(result=["foo", "bar"]) == "foo bar"

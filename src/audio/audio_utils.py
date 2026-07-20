@@ -233,9 +233,9 @@ def _get_sounddevice_default_device(_kind: str | None = None) -> AudioDeviceInfo
         return None
 
     try:
-        info: dict[str, object] = sd.query_devices(device=None, kind=_kind if _kind is not None else "input")  # pyright: ignore[reportAny, reportUnknownMemberType]
+        info: dict[str, object] = sd.query_devices(device=None, kind=_kind if _kind is not None else "input")
         return AudioDeviceInfo(
-            index=sd.default.device[0] if (_kind or "input") == "input" else sd.default.device[1],  # pyright: ignore[reportAny]
+            index=sd.default.device[0] if (_kind or "input") == "input" else sd.default.device[1],
             name=str(cast(str, info.get("name", ""))),
             max_input_channels=int(cast(int, info.get("max_input_channels", 0))),
             max_output_channels=int(cast(int, info.get("max_output_channels", 0))),
@@ -267,7 +267,7 @@ def list_audio_devices(backend: str | None = None) -> list[AudioDeviceInfo]:
         try:
             import sounddevice as sd
             # sd_devices is a DeviceList
-            sd_devices = cast(list[dict[str, object]], sd.query_devices())  # pyright: ignore[reportUnknownMemberType]
+            sd_devices = cast(list[dict[str, object]], sd.query_devices())
 
             for i, dev in enumerate(sd_devices):
                 devices.append(AudioDeviceInfo(
@@ -482,7 +482,7 @@ def validate_and_clean_audio(
 
     if has_invalid:
         # Verify the cleanup worked
-        _ = np.sqrt(np.mean(audio_array**2))  # pyright: ignore[reportAny]
+        _ = np.sqrt(np.mean(audio_array**2))
 
     return audio_array
 
@@ -533,13 +533,13 @@ def resample_audio(
         return audio
 
     try:
-        from scipy.signal import resample_poly  # pyright: ignore[reportUnknownVariableType]
+        from scipy.signal import resample_poly
 
         g = gcd(original_rate, target_rate)
         up = target_rate // g
         down = original_rate // g
 
-        _audio: NDArray[np.float32] = resample_poly(audio, up, down).astype(np.float32)  # pyright: ignore[reportAny]
+        _audio: NDArray[np.float32] = resample_poly(audio, up, down).astype(np.float32)
         return _audio
     except ImportError:
         logger.warning("scipy not available, using simple resampling")
@@ -671,7 +671,7 @@ class AudioInputStream(AudioStream, ABC):
         if self._stream is not None:
             try:
                 if hasattr(self._stream, 'close'):
-                    _ = getattr(self._stream, 'close')()  # pyright: ignore[reportAny]
+                    _ = getattr(self._stream, 'close')()
             except Exception as e:
                 logger.debug("Error closing stream: %s", e)
             self._stream = None
@@ -718,7 +718,7 @@ class AudioOutputStream(AudioStream, ABC):
         if self._stream is not None:
             try:
                 if hasattr(self._stream, 'close'):
-                    _ = getattr(self._stream, 'close')()  # pyright: ignore[reportAny]
+                    _ = getattr(self._stream, 'close')()
             except Exception as e:
                 logger.debug("Error closing stream: %s", e)
             self._stream = None
@@ -825,7 +825,7 @@ class SoundDeviceInputStream(AudioInputStream):
         super().stop()
         if self._stream is not None:
             try:
-                _ = getattr(self._stream, 'stop')()  # pyright: ignore[reportAny]
+                _ = getattr(self._stream, 'stop')()
             except Exception as e:
                 logger.debug("Error stopping SoundDevice stream: %s", e)
 
@@ -899,12 +899,12 @@ class SoundDeviceOutputStream(AudioOutputStream):
                 if audio_array.dtype == np.int16:
                     audio_array = audio_array.astype(np.float32) / 32768.0
 
-                _ = getattr(self._stream, 'write')(audio_array)  # pyright: ignore[reportAny]
+                _ = getattr(self._stream, 'write')(audio_array)
             else:
                 # Already numpy array
                 if data.dtype == np.int16:
                     data = data.astype(np.float32) / 32768.0
-                _ = getattr(self._stream, 'write')(data)  # pyright: ignore[reportAny]
+                _ = getattr(self._stream, 'write')(data)
         except Exception as e:
             logger.debug("SoundDevice output write error: %s", e)
 
@@ -959,9 +959,9 @@ class AudioPlayer:
                 logger.error("Audio file not found: %s", resolved_path)
                 return False
 
-            read_result = sf.read(resolved_path, dtype="float32")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            audio_data, sample_rate = read_result  # pyright: ignore[reportUnknownVariableType, reportAny]
-            return self.play_data(audio_data, int(sample_rate))  # pyright: ignore[reportUnknownArgumentType, reportAny]
+            read_result = sf.read(resolved_path, dtype="float32")
+            audio_data, sample_rate = read_result
+            return self.play_data(audio_data, int(sample_rate))
 
         except ImportError:
             # Fallback to system player
@@ -1018,9 +1018,9 @@ class AudioPlayer:
             audio = validate_and_clean_audio(audio_data)
 
             device = self._config.audio.output_device_index if self._config is not None else None
-            _ = sd.play(audio, samplerate=sample_rate, device=device)  # pyright: ignore[reportUnknownMemberType]
+            _ = sd.play(audio, samplerate=sample_rate, device=device)
             if block:
-                _ = sd.wait()  # pyright: ignore[reportUnknownVariableType]
+                _ = sd.wait()
 
             return True
 
@@ -1070,7 +1070,7 @@ class AudioPlayer:
     def close(self) -> None:
         """Close the player and release resources."""
         if self._stream is not None:
-            _ = getattr(self._stream, 'close')()  # pyright: ignore[reportAny]
+            _ = getattr(self._stream, 'close')()
             self._stream = None
 
 # =============================================================================

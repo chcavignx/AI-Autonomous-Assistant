@@ -4,8 +4,8 @@
 Runs all audio hardware integration tests in sequence with clear reporting.
 
 Usage:
-  python examples/run_all_audio_tests.py      # Run all tests
-  python examples/run_all_audio_tests.py --verbose  # Detailed output
+  python examples/audio/run_all_audio_tests.py      # Run all tests
+  python examples/audio/run_all_audio_tests.py --verbose  # Detailed output
 """
 
 import subprocess
@@ -36,7 +36,7 @@ def run_test(test_name: str, script: str) -> bool:
     try:
         result = subprocess.run(
             [sys.executable, str(script_path)],
-            cwd=Path(__file__).parent.parent,
+            cwd=Path(__file__).parent.parent.parent,
             timeout=60,
         )
         return result.returncode == 0
@@ -48,18 +48,32 @@ def run_test(test_name: str, script: str) -> bool:
 
 def main() -> int:
     """Run all integration tests."""
+    print("==================================================")
+    print("Running Audio Library Hardware Integration Tests")
+    print("==================================================")
     results: list[tuple[str, bool]] = []
     for test_name, script in TESTS:
+        print(f"Running {test_name} ({script})... ", end="", flush=True)
         success = run_test(test_name, script)
+        if success:
+            print("✓ PASSED")
+        else:
+            print("✗ FAILED")
         results.append((test_name, success))
 
     # Summary
-
+    print("==================================================")
+    print("INTEGRATION TESTS SUMMARY")
+    print("==================================================")
     passed: int = sum(1 for _, success in results if success)
     total: int = len(results)
 
     for test_name, success in results:
-        pass
+        status = "✓ PASSED" if success else "✗ FAILED"
+        print(f"  - {test_name}: {status}")
+    print("--------------------------------------------------")
+    print(f"Overall: {passed}/{total} tests passed")
+    print("==================================================")
 
     return 0 if passed == total else 1
 

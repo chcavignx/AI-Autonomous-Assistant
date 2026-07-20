@@ -1,0 +1,11 @@
+# Response keywords and translation configurations
+responses:
+  language: "en"
+  use_llm: true
+  files:
+    en: "data/responses_en.yaml"
+    fr: "data/responses_fr.yaml"
+  llm_payload:
+    model: "{model}"
+    prompt: "You are a helpful, concise voice assistant. The user said: '{user_input}'. Respond shortly in one or two sentences."
+    stream: false

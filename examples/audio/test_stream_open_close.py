@@ -5,7 +5,7 @@ Tests that audio streams can be opened, used, and closed safely.
 Validates codec configuration and frame buffer sizing.
 
 Run with:
-  python examples/test_stream_open_close.py
+  python examples/audio/test_stream_open_close.py
 """
 
 import logging
@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 
 # Ensure repo root is accessible
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.audio.audio_utils import (
     open_input_stream_with_fallback,
@@ -75,9 +75,17 @@ def test_input_stream_open_close() -> bool | None:
         # Verify stream is active
         assert stream.active, "Stream is not active"
 
-        # Read one chunk
-        data = stream.read(chunk_frames)
-        assert data is not None, "No data read from stream"
+        # Read one chunk with retry loop to allow buffer initialization
+        import time
+        data = None
+        start_time = time.time()
+        while time.time() - start_time < 2.0:
+            data = stream.read(chunk_frames)
+            if data is not None:
+                break
+            time.sleep(0.1)
+
+        assert data is not None, "No data read from stream (timed out after 2s)"
         assert len(data) > 0, "Empty data read from stream"
 
         # Stop stream
@@ -89,6 +97,8 @@ def test_input_stream_open_close() -> bool | None:
         return True
 
     except Exception:
+        import traceback
+        traceback.print_exc()
         return False
     finally:
         if stream:
@@ -134,6 +144,8 @@ def test_output_stream_open_close() -> bool | None:
         return True
 
     except Exception:
+        import traceback
+        traceback.print_exc()
         return False
     finally:
         if stream:
@@ -141,6 +153,7 @@ def test_output_stream_open_close() -> bool | None:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     success1 = test_input_stream_open_close()
     success2 = test_output_stream_open_close()
 

@@ -18,8 +18,8 @@ def print_sys_usage(_step: str) -> None:
     cpu: float = psutil.cpu_percent(interval=0.5)
     # virtual_memory returns a namedtuple
     vm = psutil.virtual_memory()
-    used_gb = float(vm.used) / 1024**3  # pyright: ignore[reportAny]
-    total_gb = float(vm.total) / 1024**3  # pyright: ignore[reportAny]
+    used_gb = float(vm.used) / 1024**3
+    total_gb = float(vm.total) / 1024**3
     logger.info("%s: CPU=%.1f%% RAM=%.2f/%.2f GB", _step, cpu, used_gb, total_gb)
 
 
@@ -70,3 +70,41 @@ def detect_raspberry_pi_model() -> bool:
     except OSError:
         pass
     return False
+
+
+def get_cpu_usage_percent(interval: float = 0.0) -> float:
+    """Get instantaneous global CPU utilization percentage.
+
+    Args:
+        interval: Blocking interval in seconds for psutil CPU check.
+
+    Returns:
+        CPU usage percentage.
+
+    """
+    return psutil.cpu_percent(interval=interval)
+
+
+def get_cpu_temperature_c() -> float | None:
+    """Get CPU temperature in Celsius (Raspberry Pi specific, falls back to vcgencmd).
+
+    Returns:
+        CPU temperature in Celsius, or None if unavailable.
+
+    """
+    try:
+        zone_path = pathlib.Path("/sys/class/thermal/thermal_zone0/temp")
+        if zone_path.exists():
+            milli_c = int(zone_path.read_text(encoding="utf-8").strip())
+            return milli_c / 1000.0
+    except Exception:
+        pass
+
+    try:
+        import subprocess
+
+        out = subprocess.check_output(["vcgencmd", "measure_temp"]).decode()
+        value = out.replace("temp=", "").replace("'C", "").strip()
+        return float(value)
+    except Exception:
+        return None

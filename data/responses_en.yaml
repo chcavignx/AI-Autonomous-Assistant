@@ -1,0 +1,33 @@
+# English responses configuration for the voice agent
+responses:
+  # Exit/Stop commands are placed first to take precedence
+  - keywords: ["stop", "exit", "quit"]
+    type: "text"
+    value: "Goodbye! Returning to wake word detection."
+    exit: true
+  - keywords: ["bye_bye", "bye"]
+    type: "text"
+    value: "See you later! Going back to sleep mode."
+    exit: true
+  - keywords: ["hello", "hi"]
+    type: "text"
+    value: "Hello! I'm {wake_word}, your AI assistant. How can I help you?"
+  - keywords: ["time"]
+    type: "action"
+    value: "get_time"
+  - keywords: ["date"]
+    type: "action"
+    value: "get_date"
+  - keywords: ["lights"]
+    type: "action"
+    value: "control_lights"
+  - keywords: ["music"]
+    type: "action"
+    value: "play_music"
+  - keywords: ["help"]
+    type: "text"
+    value: "I can respond to simple commands like hello, hi, time, date, lights, music, stop and bye-bye."
+  # Empty keywords acts as default / fallback
+  - keywords: []
+    type: "llm"
+    value: "You said: {user_input}. I'm still learning how to respond to that."

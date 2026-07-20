@@ -15,5 +15,15 @@ pipewire-alsa
 espeak-ng
 libspeexdsp-dev
 
-# Installation Hailo-8L sur Raspberry Pi 5
+# Install vision dependencies for raspberry pi 5 camera (USB) and AI camera
+sudo apt-get install -y \
+python3-picamera2
+imx500-all
+python3-opencv
+python3-munkres
+python3-numpy
+python3-matplotlib
+
+
+# Installation Hailo-8L sur Raspberry Pi 5 see "https://www.raspberrypi.com/documentation/computers/ai.html"
 sudo apt install -y hailo-all

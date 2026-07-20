@@ -1,0 +1,33 @@
+# French responses configuration for the voice agent
+responses:
+  # Les commandes d'arrêt sont placées en premier pour être prioritaires
+  - keywords: ["arrête", "arrete", "quitter", "stop"]
+    type: "text"
+    value: "Au revoir ! Retour à l'écoute du mot d'activation."
+    exit: true
+  - keywords: ["bye_bye", "bye", "salut", "a plus"]
+    type: "text"
+    value: "À plus tard ! Retour en mode veille."
+    exit: true
+  - keywords: ["bonjour"]
+    type: "text"
+    value: "Bonjour! Je suis {wake_word}, votre assistant IA. Comment puis-je vous aider ?"
+  - keywords: ["heure"]
+    type: "action"
+    value: "get_time"
+  - keywords: ["date"]
+    type: "action"
+    value: "get_date"
+  - keywords: ["lumière", "lumieres", "lumières"]
+    type: "action"
+    value: "control_lights"
+  - keywords: ["musique"]
+    type: "action"
+    value: "play_music"
+  - keywords: ["aide"]
+    type: "text"
+    value: "Je peux répondre à des commandes simples comme bonjour, heure, date, lumière, musique, et arrête."
+  # Empty keywords acts as default / fallback
+  - keywords: []
+    type: "llm"
+    value: "Vous avez dit : {user_input}. Je suis encore en train d'apprendre comment répondre à cela."

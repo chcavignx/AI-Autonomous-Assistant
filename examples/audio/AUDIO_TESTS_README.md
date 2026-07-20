@@ -11,12 +11,11 @@ These tests follow a **simple-first, build-progressively** approach:
 3. **Playback** - Can we play audio through output?
 4. **Recording** - Can we capture audio from input?
 5. **Recorder Standalone** - Can the simplified AudioRecorder capture and format chunks?
-6. **ASR Integration** - Can the high-level ASREngine capture and transcribe chunks?
-7. **ASR with TTS** - Can ASREngine transcribe TTS audio output?
-8. **ASR Recording Validation** - Can we transcribe microphone recordings?
-9. **Wake Word Standalone** - Can the WakeWordDetector load models and capture audio in background?
-10. **VAD Standalone** - Can the deep learning Silero VAD engine detect speech segments and handle resampling?
-11. **TTS Lifecycle & Utils** - Can we manage non-blocking TTS, interruptions, and utility conversions?
+6. **ASR with TTS** - Can ASREngine transcribe TTS audio output?
+7. **ASR Recording Validation** - Can we transcribe microphone recordings?
+8. **Wake Word Standalone** - Can the WakeWordDetector load models and capture audio in background?
+9. **VAD Standalone** - Can the deep learning Silero VAD engine detect speech segments and handle resampling?
+10. **TTS Lifecycle & Utils** - Can we manage non-blocking TTS, interruptions, and utility conversions?
 
 Each test is **self-contained and can run independently** on any system with audio hardware.
 
@@ -37,7 +36,7 @@ Each test is **self-contained and can run independently** on any system with aud
 **Run:**
 
 ```bash
-python examples/test_hardware_detection.py
+python examples/audio/test_hardware_detection.py
 ```
 
 **Expected output:**
@@ -71,7 +70,7 @@ Output devices (2):
 **Run:**
 
 ```bash
-python examples/test_stream_open_close.py
+python examples/audio/test_stream_open_close.py
 ```
 
 **Key validations:**
@@ -98,7 +97,7 @@ python examples/test_stream_open_close.py
 **Run:**
 
 ```bash
-python examples/test_playback.py
+python examples/audio/test_playback.py
 ```
 
 **Key validations:**
@@ -128,7 +127,7 @@ python examples/test_playback.py
 **Run:**
 
 ```bash
-python examples/test_recording.py
+python examples/audio/test_recording.py
 ```
 
 **Key validations:**
@@ -157,33 +156,12 @@ python examples/test_recording.py
 **Run:**
 
 ```bash
-python examples/test_recorder_standalone.py
+python examples/audio/test_recorder_standalone.py
 ```
 
 ---
 
-### 6. ASR Engine Integration (`test_asr_integration.py`)
-
-**Purpose:** Verify the full ASR pipeline using the production `ASREngine`.
-
-**What it tests:**
-
-- Loads the ASR model (Whisper/Faster-Whisper)
-- Validates that the engine thread captures audio chunks
-- Checks that the VAD (Voice Activity Detection) system is initialized
-- Verifies the callback system for transcriptions
-
-**Run:**
-
-```bash
-python examples/test_asr_integration.py
-```
-
-**Skips if:** No input device available.
-
----
-
-### 7. ASR with TTS (`test_asr_with_tts.py`)
+### 6. ASR with TTS (`test_asr_with_tts.py`)
 
 **Purpose:** Verify that the high-level `ASREngine` can accurately transcribe speech generated dynamically by the `TTSEngine` (loopback integration).
 
@@ -196,12 +174,12 @@ python examples/test_asr_integration.py
 **Run:**
 
 ```bash
-python examples/test_asr_with_tts.py
+python examples/audio/test_asr_with_tts.py
 ```
 
 ---
 
-### 8. ASR Recording Validation (`test_asr_recording_validation.py`)
+### 7. ASR Recording Validation (`test_asr_recording_validation.py`)
 
 **Purpose:** Validate dynamic user recording capture and transcription pipeline.
 
@@ -214,14 +192,14 @@ python examples/test_asr_with_tts.py
 **Run:**
 
 ```bash
-python examples/test_asr_recording_validation.py
+python examples/audio/test_asr_recording_validation.py
 ```
 
 **Skips if:** No input device available.
 
 ---
 
-### 9. Wake Word Standalone (`test_wake_word_standalone.py`)
+### 8. Wake Word Standalone (`test_wake_word_standalone.py`)
 
 **Purpose:** Validate the `WakeWordDetector` engine in isolation.
 
@@ -234,12 +212,12 @@ python examples/test_asr_recording_validation.py
 **Run:**
 
 ```bash
-python examples/test_wake_word_standalone.py
+python examples/audio/test_wake_word_standalone.py
 ```
 
 ---
 
-### 10. VAD Standalone Flow (`test_vad_standalone.py`)
+### 9. VAD Standalone Flow (`test_vad_standalone.py`)
 
 **Purpose:** Validate voice activity detection state machines and audio sample rate converters.
 
@@ -253,12 +231,12 @@ python examples/test_wake_word_standalone.py
 **Run:**
 
 ```bash
-python examples/test_vad_standalone.py
+python examples/audio/test_vad_standalone.py
 ```
 
 ---
 
-### 11. TTS Lifecycle & Utils (`test_tts_lifecycle_and_utils.py`)
+### 10. TTS Lifecycle & Utils (`test_tts_lifecycle_and_utils.py`)
 
 **Purpose:** Validate advanced non-blocking TTSEngine APIs and low-level utility operations.
 
@@ -273,7 +251,7 @@ python examples/test_vad_standalone.py
 **Run:**
 
 ```bash
-python examples/test_tts_lifecycle_and_utils.py
+python examples/audio/test_tts_lifecycle_and_utils.py
 ```
 
 ---
@@ -281,10 +259,10 @@ python examples/test_tts_lifecycle_and_utils.py
 ## Run All Tests
 
 ```bash
-python examples/run_all_audio_tests.py
+python examples/audio/run_all_audio_tests.py
 ```
 
-Runs all 11 tests in sequence with a summary report.
+Runs all 10 tests in sequence with a summary report.
 
 ---
 
@@ -341,8 +319,8 @@ Use these tests for **deployment health checks**:
 #!/bin/bash
 # health_check.sh - Verify audio subsystem on deployment
 
-python examples/test_hardware_detection.py || exit 1
-python examples/test_stream_open_close.py || exit 1
+python examples/audio/test_hardware_detection.py || exit 1
+python examples/audio/test_stream_open_close.py || exit 1
 echo "Audio subsystem healthy"
 ```
 
@@ -358,16 +336,22 @@ If all tests pass:
    pytest tests/audio/ -v
    ```
 
-2. **Test the full ASR engine:**
+2. **Test the standalone Whisper STT model:**
 
    ```bash
-   python examples/check_audio_flow.py
+   python examples/STT/whisper/test_whisper.py
    ```
 
-3. **Test TTS playback:**
+3. **Test the standalone Piper TTS model:**
 
    ```bash
-   python examples/TTS/test_piper_tts.py  # if available
+   python examples/TTS/text2speech_piper.py
+   ```
+
+4. **Test the offline voice agent flow:**
+
+   ```bash
+   python examples/VAD/voice_agent_offline.py
    ```
 
 ---
@@ -395,7 +379,7 @@ To add a new integration test:
    - Print progress with status symbols (✓/✗/⊘)
    - Exit with code 0 (success) or 1 (failure)
 3. Add to `run_all_audio_tests.py` in the `TESTS` list
-4. Run manually first: `python examples/test_new_feature.py`
+4. Run manually first: `python examples/audio/test_new_feature.py`
 
 ---
 

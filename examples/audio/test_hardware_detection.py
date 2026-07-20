@@ -5,7 +5,7 @@ Simple first test to validate audio hardware is accessible.
 Useful for deployment verification and CI/CD health checks.
 
 Run with:
-  python examples/test_hardware_detection.py
+  python examples/audio/test_hardware_detection.py
 """
 
 import logging
@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 # Ensure repo root is accessible
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.audio.audio_utils import get_audio_backend, list_audio_devices
 

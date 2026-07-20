@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 
 # Ensure repo root is accessible
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import numpy as np
 from numpy.typing import NDArray
@@ -138,7 +138,7 @@ def test_playback_tts_wav() -> bool:
     player.close()
 
     # Save to temporary file for verification
-    tmp_file = Path(__file__).parent.parent / ".tmp" / "test_playback_tts.wav"
+    tmp_file = Path(__file__).parent.parent.parent / ".tmp" / "test_playback_tts.wav"
     tmp_file.parent.mkdir(exist_ok=True)
 
     with tmp_file.open("wb") as wf:
@@ -154,7 +154,7 @@ def test_playback_file() -> bool:
         return True
 
     # Use existing test.wav or create a small one
-    wav_path = Path(__file__).resolve().parent.parent / "data" / "test.wav"
+    wav_path = Path(__file__).resolve().parent.parent.parent / "data" / "test.wav"
     if not wav_path.exists():
         return True
 

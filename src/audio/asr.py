@@ -525,7 +525,7 @@ class ASREngine:
         with self._wav_writer_lock:
             if self._wav_writer is not None:
                 self._wav_writer.writeframes(audio_bytes)
-                logger.debug("Audio chunk stored: %s", self._config.asr.store_audio_path)
+        logger.debug("Audio chunk stored: %s", self._config.asr.store_audio_path)
 
     def _transcribe(self, audio_bytes: bytes) -> None:
         """Transcribe accumulated audio buffer."""
