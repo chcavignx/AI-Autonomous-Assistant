@@ -63,7 +63,7 @@ audio:
   input_chunk_size: 1024
   input_device_index: 0 # use system default when a mic is attached
   input_device_name: 'USB ENC Audio Device'  # Optional name of input device to select (overrides index if found)
-  volume: 0.5  # half as loud
+  volume: 0.8  # half as loud
   output_device_index: 1 # default to USB PnP Audio Device: Audio (hw:3,0)
   output_sample_rate: 44100
   output_chunk_ms: 300  # taille des chunks audio en ms
@@ -73,4 +73,47 @@ audio:
 # Platform-specific configuration
 platform:
   cpu_cores: 2  # Limit CPU cores for multiprocessing on Pi5
-  pi: false  # Automatically detect Raspberry Pi and apply tuning
+  pi: true  # Automatically detect Raspberry Pi and apply tuning
+
+# Vision configuration
+vision:
+  object_model_type: "yolo"  # "yolo" (CPU), "yolo_hailo" (Hailo NPU), "yolo_imx500" (Sony IMX500)
+  object_model_name: "yolo26n.onnx"  # Options: "yolo26n.onnx" (default fast), "LibreYOLOXn.onnx" (100% free / MIT license)
+  object_model_path: null  # Let Python code build the path dynamically
+  object_device: "cpu"  # CPU or "hailo"
+  object_inference_framework: "onnx" # "ncnn"
+  object_nms: False  # Enable NMS in Python (after export)
+  object_image_size: 640  # Image size for YOLO model
+  object_recognition_threshold: 0.5
+  face_detector_type: "insightface"  # "cascade", "insightface", "hailo", "imx500"
+  face_model_name: "buffalo_l" # "imx500_yolo11n.rpk" # "buffalo_l" #"imx500_network_mobilenet_v2.rpk" #"buffalo_l" #"haarcascade_frontalface_default.xml" , "buffalo_l" for insightface
+  face_model_path: null # "/data/imx500_yolo11n.rpk" # for "/data/imx500_yolo11n.rpk" imx500 # null for insightface
+  face_recognition_threshold: 0.4
+  post_processing_enabled: false
+  post_processing_model: "arcface_r100_v1.onnx"
+  post_processing_model_type: "insightface"
+  post_processing_model_path: null # Let Python code build the path dynamically
+  post_processing_image_size: 640
+  enable_face_detection: true
+  enable_face_recognition: true
+  enable_object_detection: true
+  face_dataset_path: "data/face_dataset/"
+  object_dataset_path: "data/object_dataset/"
+
+  camera:
+    camera_index: 0
+    frame_width: 1080
+    frame_height: 720
+    format: "RGB888" # "YUV420" or "RGB888"
+    lores_frame_width: 320
+    lores_frame_height: 240
+    lores_format: "YUV420"
+    imx500_frame_width: 640
+    imx500_frame_height: 480
+# Local LLM settings for fallbacks or open-ended queries
+llm:
+  api_type: "ollama"
+  model: "llama3.2:latest"
+  url: "http://127.0.0.1:11434/api/generate"
+  timeout: 30.0
+  api_key: null

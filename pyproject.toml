@@ -158,7 +158,7 @@ ignore = [
     "ISC001",  # implicit string concat - conflicts with ruff format
     "TD003",   # missing link in TODO
     "FIX002",  # line contains TODO (I have TODOs and I'm not apologizing)
-    "D100", "D101", "D102", "D103", "D104", "DOC201", "DOC402", "DOC501", # docstrings - I don't care about docstrings, Ruff. Relax.
+    "D100", "D101", "D102", "D103", "D104", "D421", "DOC201", "DOC402", "DOC501", # docstrings - I don't care about docstrings, Ruff. Relax.
     "FBT",     # Boolean positional args
     "PLW0717", # Try clause contains too many statements
     "PLC0415", # Import should be at the top-level
