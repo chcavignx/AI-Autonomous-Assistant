@@ -26,9 +26,9 @@ jobs:
           install-system-packages: "true"
           sync-flags: "--locked --no-default-groups --group lint"
       - name: Run Ruff linter
-        run: uv run ruff check .
+        run: uv run --no-sync ruff check .
       - name: Run Ruff formatter
-        run: uv run ruff format --check .
+        run: uv run --no-sync ruff format --check .
 
   test:
     name: Test "${{ inputs.marker }}"
@@ -48,9 +48,9 @@ jobs:
         uses: ./.github/actions/python-uv-setup
         with:
           install-system-packages: "true"
-          sync-flags: "--locked --no-default-groups --group test"
+          sync-flags: "--locked --no-default-groups --group test --extra vision"
       - name: Run core tests
-        run: uv run pytest -n auto -m "${{ inputs.marker }}" --cov=src --cov-report=xml tests/
+        run: uv run --no-sync pytest -n auto -m "${{ inputs.marker }}" --cov=src --cov-report=xml tests/
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
@@ -73,9 +73,9 @@ jobs:
         with:
           enable-cache: true
           install-system-packages: "true"
-          sync-flags: "--locked --no-default-groups --group test --extra raspberry-pi"
+          sync-flags: "--locked --no-default-groups --group test --extra vision --extra raspberry-pi"
       - name: Run Raspberry Pi profile tests
-        run: uv run pytest -n auto -m "${{ inputs.marker }}" --cov=src --cov-report=xml tests/
+        run: uv run --no-sync pytest -n auto -m "${{ inputs.marker }}" --cov=src --cov-report=xml tests/
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
