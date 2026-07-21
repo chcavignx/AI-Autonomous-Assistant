@@ -75,7 +75,7 @@ def test_pi_camera_wrapper() -> None:
         assert pi_cam.camera_info == "Mock Pi Camera 2"
         assert pi_cam.get_info_str() == "Mock Pi Camera 2"
 
-        pi_cam.start(320, 240, format="YUV420")
+        pi_cam.start(320, 240, video_format="YUV420")
         mock_picam.create_video_configuration.assert_called_once_with(main={"size": (320, 240), "format": "YUV420"})
         mock_picam.configure.assert_called_once()
         mock_picam.start.assert_called_once()
@@ -99,8 +99,10 @@ def test_discover_pi_cameras_success() -> None:
     """Test discover_pi_cameras successfully discovers devices."""
     mock_picam = MagicMock()
     mock_picam.camera_info = "Mock Pi Camera"
-
-    with patch.dict("sys.modules", {"picamera2": MagicMock(Picamera2=MagicMock(return_value=mock_picam))}):
+    with (
+        patch.dict("sys.modules", {"picamera2": MagicMock(Picamera2=MagicMock(return_value=mock_picam))}),
+        patch("importlib.util.find_spec", return_value=True),
+    ):
         cams = camera.discover_pi_cameras()
         assert len(cams) == 2
         assert all(isinstance(c, camera.PiCamera) for c in cams)

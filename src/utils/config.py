@@ -30,42 +30,42 @@ class PathConfig(BaseModel):
 
     @property
     def src_path(self) -> Path:
-        """Get the path to the source directory."""
+        """The path to the source directory."""
         return ROOT_DIR / self.src
 
     @property
     def data_path(self) -> Path:
-        """Get the path to the data directory."""
+        """The path to the data directory."""
         return ROOT_DIR / self.data
 
     @property
     def cache_path(self) -> Path:
-        """Get the path to the cache directory."""
+        """The path to the cache directory."""
         return ROOT_DIR / self.cache
 
     @property
     def models_path(self) -> Path:
-        """Get the path to the models directory."""
+        """The path to the models directory."""
         return self.cache_path / self.models
 
     @property
     def models_audio_path(self) -> Path:
-        """Get the path to the models directory."""
+        """The path to the models directory."""
         return self.cache_path / "audio" / self.models
 
     @property
     def models_vision_path(self) -> Path:
-        """Get the path to the models directory."""
+        """The path to the models directory."""
         return self.cache_path / "vision" / self.models
 
     @property
     def dataset_vision_path(self) -> Path:
-        """Get the path to the models directory."""
+        """The path to the models directory."""
         return self.cache_path / "vision" / self.data
 
     @property
     def tmp_path(self) -> Path:
-        """Get the path to the tmp directory."""
+        """The path to the tmp directory."""
         return ROOT_DIR / self.tmp
 
 
@@ -88,7 +88,7 @@ class ASRConfig(PathConfig):
 
     @property
     def download_path(self) -> Path:
-        """Get the download path for the ASR model."""
+        """The download path for the ASR model."""
         if self.download_root:
             p = ROOT_DIR / self.download_root
             if p.name == self.engine:
@@ -98,7 +98,7 @@ class ASRConfig(PathConfig):
 
     @property
     def full_model_path(self) -> Path:
-        """Get the full path to the ASR model."""
+        """The full path to the ASR model."""
         return self.download_path / f"{self.language}-{self.model_size}.onnx"
 
 
@@ -119,7 +119,7 @@ class TTSConfig(PathConfig):
 
     @property
     def full_model_path(self) -> Path:
-        """Get the full path to the TTS model."""
+        """The full path to the TTS model."""
         if self.model_path:
             p = ROOT_DIR / self.model_path
             # If it's already a file path, return it
@@ -147,29 +147,29 @@ class WakeConfig(PathConfig):
 
     @property
     def download_path(self) -> Path:
-        """Get the download path for the wakeword model."""
+        """The download path for the wakeword model."""
         if self.download_root:
             return (ROOT_DIR / self.download_root).resolve()
         return self.models_audio_path / "wakeword"
 
     @property
     def full_model_path(self) -> Path:
-        """Get the full path to the wakeword model."""
+        """The full path to the wakeword model."""
         return self.download_path / f"{self.model_name}.{self.inference_framework}"
 
     @property
     def embedding_model_path(self) -> Path:
-        """Get the full path to the embedding model."""
+        """The full path to the embedding model."""
         return self.download_path / f"{self.embedding_model}.{self.inference_framework}"
 
     @property
     def melspec_model_path(self) -> Path:
-        """Get the full path to the melspec model."""
+        """The full path to the melspec model."""
         return self.download_path / f"{self.melspec_model}.{self.inference_framework}"
 
     @property
     def silero_vad_model_path(self) -> Path:
-        """Get the full path to the silero vad model."""
+        """The full path to the silero vad model."""
         return self.download_path / f"{self.silero_vad_model}.{self.inference_framework}"
 
 
@@ -281,7 +281,7 @@ class VisionConfig(PathConfig):
 
     @property
     def object_model_full_path(self) -> Path:
-        """Get the resolved full path to the object detection model."""
+        """The resolved full path to the object detection model."""
         raw_path = self.object_model_path  # Access Pydantic field value
         if raw_path:
             p = ROOT_DIR / raw_path
@@ -304,7 +304,7 @@ class VisionConfig(PathConfig):
 
     @property
     def face_detector_model_path(self) -> Path:
-        """Get the full path to the detector model."""
+        """The full path to the detector model."""
         if self.face_model_path:
             p = ROOT_DIR / self.face_model_path
             if p.suffix in {".onnx", ".hef", ".rpk"}:
@@ -313,7 +313,7 @@ class VisionConfig(PathConfig):
 
     @property
     def post_processing_model_full_path(self) -> Path:
-        """Get the full path to the post-processing model."""
+        """The full path to the post-processing model."""
         raw_path = self.post_processing_model_path
         if raw_path:
             p = ROOT_DIR / raw_path

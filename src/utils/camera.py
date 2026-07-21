@@ -183,9 +183,9 @@ class PiCamera:
         """Return the string representation of camera_info."""
         return str(self.camera_info)
 
-    def start(self, width: int = 640, height: int = 480, format: str = "XRGB8888") -> None:  # ruff:ignore[builtin-argument-shadowing]
+    def start(self, width: int = 640, height: int = 480, video_format: str = "XRGB8888") -> None:
         """Configure the video configuration and start the stream."""
-        config = self._cam.create_video_configuration(main={"size": (width, height), "format": format})
+        config = self._cam.create_video_configuration(main={"size": (width, height), "format": video_format})
         self._cam.configure(config)
         self._cam.start()  # type: ignore[attr-defined]
         self.started = True

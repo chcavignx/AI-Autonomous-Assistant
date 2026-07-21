@@ -16,13 +16,13 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pytest
+from src.utils.config import load_config
+from src.vision.video_capture import VideoCapture
 
 # Ensure project root is in path
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from src.utils.config import load_config  # ruff:ignore[module-import-not-at-top-of-file]
-from src.vision.video_capture import VideoCapture  # ruff:ignore[module-import-not-at-top-of-file]
 
 # ---------------------------------------------------------------------------
 # Static dataset image (fallback when no camera is connected)

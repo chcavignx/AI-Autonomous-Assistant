@@ -5,15 +5,14 @@ from __future__ import annotations
 import sys
 from unittest.mock import MagicMock
 
+import numpy as np  #
 import pytest
+from src.vision.yolo_imx500 import Imx500Config, Imx500Detector  #
 
 sys.modules["picamera2"] = MagicMock()
 sys.modules["picamera2.devices"] = MagicMock()
 sys.modules["picamera2.devices.imx500"] = MagicMock()
 sys.modules["picamera2.devices.imx500.postprocess"] = MagicMock()
-
-import numpy as np  # ruff:ignore[module-import-not-at-top-of-file]
-from src.vision.yolo_imx500 import Imx500Config, Imx500Detector  # ruff:ignore[module-import-not-at-top-of-file]
 
 
 def test_imx500_detector_lifecycle() -> None:

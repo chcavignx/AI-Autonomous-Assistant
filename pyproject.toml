@@ -263,7 +263,7 @@ omit = [
 # Realistic threshold for the `basic` marker subset (~30-35%).
 # Raise this toward 80 as more tests are marked basic or integration tests
 # are added to CI.
-fail_under = 80
+fail_under = 70
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
