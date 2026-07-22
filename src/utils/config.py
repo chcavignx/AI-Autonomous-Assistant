@@ -7,7 +7,7 @@ import logging.config
 import sys
 from collections.abc import Mapping
 from pathlib import Path
-from typing import cast
+from typing import Any, ClassVar, cast
 
 import yaml
 from pydantic import BaseModel, Field
@@ -30,32 +30,42 @@ class PathConfig(BaseModel):
 
     @property
     def src_path(self) -> Path:
-        """Returns the path to the source directory."""
+        """The path to the source directory."""
         return ROOT_DIR / self.src
 
     @property
     def data_path(self) -> Path:
-        """Returns the path to the data directory."""
+        """The path to the data directory."""
         return ROOT_DIR / self.data
 
     @property
     def cache_path(self) -> Path:
-        """Returns the path to the cache directory."""
+        """The path to the cache directory."""
         return ROOT_DIR / self.cache
 
     @property
     def models_path(self) -> Path:
-        """Returns the path to the models directory."""
+        """The path to the models directory."""
         return self.cache_path / self.models
 
     @property
     def models_audio_path(self) -> Path:
-        """Returns the path to the models directory."""
+        """The path to the models directory."""
         return self.cache_path / "audio" / self.models
 
     @property
+    def models_vision_path(self) -> Path:
+        """The path to the models directory."""
+        return self.cache_path / "vision" / self.models
+
+    @property
+    def dataset_vision_path(self) -> Path:
+        """The path to the models directory."""
+        return self.cache_path / "vision" / self.data
+
+    @property
     def tmp_path(self) -> Path:
-        """Returns the path to the tmp directory."""
+        """The path to the tmp directory."""
         return ROOT_DIR / self.tmp
 
 
@@ -71,14 +81,14 @@ class ASRConfig(PathConfig):
     transformers_engine: str = "huggingface"
     download_root: str | None = None
     device: str = "cpu"  # Pi5 : CPU (or "hailo")
-    compute_type: str = "int8"  # INT8 = 2x plus rapide sur ARM
+    compute_type: str = "int8"  # INT8 = 2x faster on ARM
     skip_native_teardown: bool = False
     store_audio: bool = False
     store_audio_path: str | None = None
 
     @property
     def download_path(self) -> Path:
-        """Returns the download path for the ASR model."""
+        """The download path for the ASR model."""
         if self.download_root:
             p = ROOT_DIR / self.download_root
             if p.name == self.engine:
@@ -88,7 +98,7 @@ class ASRConfig(PathConfig):
 
     @property
     def full_model_path(self) -> Path:
-        """Returns the full path to the ASR model."""
+        """The full path to the ASR model."""
         return self.download_path / f"{self.language}-{self.model_size}.onnx"
 
 
@@ -109,7 +119,7 @@ class TTSConfig(PathConfig):
 
     @property
     def full_model_path(self) -> Path:
-        """Returns the full path to the TTS model."""
+        """The full path to the TTS model."""
         if self.model_path:
             p = ROOT_DIR / self.model_path
             # If it's already a file path, return it
@@ -137,29 +147,29 @@ class WakeConfig(PathConfig):
 
     @property
     def download_path(self) -> Path:
-        """Returns the download path for the wakeword model."""
+        """The download path for the wakeword model."""
         if self.download_root:
             return (ROOT_DIR / self.download_root).resolve()
         return self.models_audio_path / "wakeword"
 
     @property
     def full_model_path(self) -> Path:
-        """Returns the full path to the wakeword model."""
+        """The full path to the wakeword model."""
         return self.download_path / f"{self.model_name}.{self.inference_framework}"
 
     @property
     def embedding_model_path(self) -> Path:
-        """Returns the full path to the embedding model."""
+        """The full path to the embedding model."""
         return self.download_path / f"{self.embedding_model}.{self.inference_framework}"
 
     @property
     def melspec_model_path(self) -> Path:
-        """Returns the full path to the melspec model."""
+        """The full path to the melspec model."""
         return self.download_path / f"{self.melspec_model}.{self.inference_framework}"
 
     @property
     def silero_vad_model_path(self) -> Path:
-        """Returns the full path to the silero vad model."""
+        """The full path to the silero vad model."""
         return self.download_path / f"{self.silero_vad_model}.{self.inference_framework}"
 
 
@@ -178,14 +188,14 @@ class AudioConfig(PathConfig):
     """Configuration for Audio Input/Output settings."""
 
     input_sample_rate: int = 22050
-    input_chunk_ms: int = 30  # taille des chunks audio en ms
+    input_chunk_ms: int = 30  # chunks size for audio in ms
     input_chunk_size: int = 500
     input_device_index: int | None = None  # None = default input device
     input_device_name: str | None = None  # Optional name of input device to select (overrides index if found)
     volume: float = 0.5  # half as loud
     output_device_index: int | None = None  # None = default output device
     output_sample_rate: int = 22050
-    output_chunk_ms: int = 30  # taille des chunks audio en ms
+    output_chunk_ms: int = 30  # chunks size for audio in ms
     output_chunk_size: int = 500
     output_device_name: str | None = None  # Optional name of output device to select (overrides index if found)
 
@@ -222,6 +232,107 @@ class PlatformConfig(PathConfig):
         _ = self.cpu_limit()
 
 
+class CameraConfig(BaseModel):
+    """Configuration for Camera settings."""
+
+    camera_index: int = 0
+    frame_width: int = 1080
+    frame_height: int = 720
+    format: str = "RGB888"  # "YUV420" or "XRGB8888"
+    lores_frame_width: int = 640
+    lores_frame_height: int = 480
+    lores_format: str = "YUV420"
+    imx500_frame_width: int = 640
+    imx500_frame_height: int = 480
+
+
+class VisionConfig(PathConfig):
+    """Configuration for Vision settings."""
+
+    model_config: ClassVar[dict[str, Any]] = {"populate_by_name": True}  # pyright: ignore[reportUndefinedVariable]
+
+    face_detector_type: str = "cascade"  # "cascade", "insightface", "imx500"
+    face_model_name: str = "haarcascade_frontalface_default.xml"  # "buffalo_l" for insightface
+    face_model_path: str | None = None
+    face_recognition_threshold: float = 0.4
+    post_processing_enabled: bool = False
+    post_processing_model_name: str = "arcface_r100_v1.onnx"  # "buffalo_l" for insightface
+    post_processing_model_type: str = (
+        "insightface"  # "insightface" (for openvino arcface_r100_v1.onnx), "buffalo_l" for buffalo_l, "hailo" for hailo
+    )
+    post_processing_model_path: str | None = None
+    post_processing_image_size: int = 640
+    post_processing_inference_framework: str = "onnx"  # "hef" for Hailo
+    object_model_type: str = "yolo"  # "yolo" (CPU), "yolo_hailo", "yolo_imx500", "libreyolo" (CPU)
+    object_model_name: str = "yolo26n.onnx"
+    object_model_path: str | None = None
+    object_device: str = "cpu"  # CPU or "hailo"
+    object_inference_framework: str = "onnx"  # "hef" for Hailo
+    object_nms: bool = False  # Enable NMS in Python (after export)
+    object_image_size: int = 640  # Image size for YOLO model
+    object_recognition_threshold: float = 0.25
+    enable_face_detection: bool = True
+    enable_face_recognition: bool = True
+    enable_object_detection: bool = True
+    face_dataset_path: str | None = None
+    object_dataset_path: str | None = None
+
+    camera: CameraConfig = CameraConfig()
+
+    @property
+    def object_model_full_path(self) -> Path:
+        """The resolved full path to the object detection model."""
+        raw_path = self.object_model_path  # Access Pydantic field value
+        if raw_path:
+            p = ROOT_DIR / raw_path
+            if p.suffix in {".onnx", ".pt", ".hef", ".rpk"}:
+                return p.resolve()
+            return (p / self.object_model_type / self.object_model_name).resolve()
+        base_name = (
+            Path(self.object_model_name).stem
+            if Path(self.object_model_name).suffix in {".onnx", ".pt", ".hef", ".rpk"}
+            else self.object_model_name
+        )
+        if self.object_inference_framework in {"onnx", "hef", "rpk"}:
+            return (
+                self.models_vision_path / self.object_model_type / f"{base_name}.{self.object_inference_framework}"
+            ).resolve()
+        if self.object_inference_framework == "ncnn":
+            return (self.models_vision_path / self.object_model_type / f"{base_name}_ncnn_model").resolve()
+        msg = f"Unknown inference framework: {self.object_inference_framework}"
+        raise ValueError(msg)
+
+    @property
+    def face_detector_model_path(self) -> Path:
+        """The full path to the detector model."""
+        if self.face_model_path:
+            p = ROOT_DIR / self.face_model_path
+            if p.suffix in {".onnx", ".hef", ".rpk"}:
+                return p.resolve()
+        return self.models_vision_path / self.face_detector_type / self.face_model_name
+
+    @property
+    def post_processing_model_full_path(self) -> Path:
+        """The full path to the post-processing model."""
+        raw_path = self.post_processing_model_path
+        if raw_path:
+            p = ROOT_DIR / raw_path
+            if p.suffix in {".onnx", ".hef"}:
+                return p.resolve()
+            return (p / self.post_processing_model_type / self.post_processing_model_name).resolve()
+        return (self.models_vision_path / self.post_processing_model_type / self.post_processing_model_name).resolve()
+
+
+class LLMConfig(BaseModel):
+    """Configuration for local or cloud LLM integration."""
+
+    api_type: str = "ollama"
+    model: str = "llama3.2:latest"
+    url: str = "http://127.0.0.1:11434/api/generate"
+    timeout: float = 5.0
+    api_key: str | None = None
+
+
 class Config:
     """Configuration for the voice agent."""
 
@@ -232,6 +343,8 @@ class Config:
     vad: VADConfig
     audio: AudioConfig
     platform: PlatformConfig
+    vision: VisionConfig
+    llm: LLMConfig
 
     def __init__(self, **data: object) -> None:
         """Build a configuration object from keyword data."""
@@ -243,6 +356,8 @@ class Config:
         self.vad = VADConfig.model_validate(data.get("vad", {}))
         self.audio = AudioConfig.model_validate(data.get("audio", {}))
         self.platform = PlatformConfig.model_validate(data.get("platform", {}))
+        self.vision = VisionConfig.model_validate(data.get("vision", {}))
+        self.llm = LLMConfig.model_validate(data.get("llm", {}))
 
     @staticmethod
     def from_mapping(data: Mapping[str, object]) -> Config:
@@ -371,7 +486,7 @@ def setup_config_logging() -> None:
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
     with Path(log_file).open("r", encoding="utf-8") as f:
-        logging.config.dictConfig(json.load(f))  # pyright: ignore[reportAny]
+        logging.config.dictConfig(json.load(f))
 
 
 setup_python_path()

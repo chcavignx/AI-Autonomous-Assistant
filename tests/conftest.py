@@ -22,11 +22,12 @@ def _is_marker_only_run(config: pytest.Config, marker: str) -> bool:
         return False
 
 
-def _is_audio_only_run(config: pytest.Config) -> bool:
-    """Return True when pytest was invoked targeting only tests/audio."""
+def _is_audio_or_llm_run(config: pytest.Config) -> bool:
+    """Return True when pytest was invoked targeting only tests/audio or tests/llm."""
     try:
         args = config.args or []
-        return any(str(a).endswith("tests/audio") or str(a).endswith("tests/audio/") for a in args)
+        targets = {"tests/audio", "tests/audio/", "tests/llm", "tests/llm/"}
+        return any(any(str(a).endswith(t) for t in targets) for a in args)
     except (AttributeError, TypeError):
         return False
 
@@ -46,17 +47,17 @@ def _disable_cov_fail_under(config: pytest.Config) -> None:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Relax coverage threshold when only running audio or basic-marker tests."""
+    """Relax coverage threshold when only running audio/llm or basic-marker tests."""
     try:
-        audio_only = all("tests/audio" in str(item.fspath) for item in items)
+        audio_or_llm_only = all("tests/audio" in str(item.fspath) or "tests/llm" in str(item.fspath) for item in items)
     except (AttributeError, TypeError):
         return
-    if audio_only or _is_marker_only_run(config, "basic"):
+    if audio_or_llm_only or _is_marker_only_run(config, "basic"):
         _disable_cov_fail_under(config)
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     """Disable coverage gate just before pytest-cov enforces it at terminal_summary."""
     config = session.config
-    if _is_audio_only_run(config) or _is_marker_only_run(config, "basic"):
+    if _is_audio_or_llm_run(config) or _is_marker_only_run(config, "basic"):
         _disable_cov_fail_under(config)

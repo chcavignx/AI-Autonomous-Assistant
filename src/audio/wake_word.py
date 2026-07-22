@@ -90,7 +90,7 @@ class ONNXAudioFeatures:
         self.raw_data_remainder = np.empty(0, dtype=np.float32)
 
         # Initialize feature buffer with random embeddings to match openWakeWord startup behavior
-        random_audio = np.random.randint(-1000, 1000, 16000 * 4).astype(np.int16)  # pyright: ignore[reportUnknownMemberType]
+        random_audio = np.random.randint(-1000, 1000, 16000 * 4).astype(np.int16)
         self.feature_buffer = self._get_embeddings(random_audio)
         self.feature_buffer_max_len = 120  # ~10 seconds of feature history
 
@@ -100,7 +100,7 @@ class ONNXAudioFeatures:
         self.melspectrogram_buffer = np.ones((76, 32), dtype=np.float32)
         self.accumulated_samples = 0
         self.raw_data_remainder = np.empty(0, dtype=np.float32)
-        random_audio = np.random.randint(-1000, 1000, 16000 * 4).astype(np.int16)  # pyright: ignore[reportUnknownMemberType]
+        random_audio = np.random.randint(-1000, 1000, 16000 * 4).astype(np.int16)
         self.feature_buffer = self._get_embeddings(random_audio)
 
     def _get_melspectrogram(
@@ -120,7 +120,7 @@ class ONNXAudioFeatures:
         if arr.ndim == 1:
             arr = np.expand_dims(arr, axis=0)
 
-        outputs = cast("list[NDArray[np.float32]]", self.melspec_session.run(None, {'input': arr}))  # pyright: ignore[reportUnknownMemberType]
+        outputs = cast("list[NDArray[np.float32]]", self.melspec_session.run(None, {'input': arr}))
         spec = outputs[0]
 
         if spec.ndim == 4:
@@ -136,7 +136,7 @@ class ONNXAudioFeatures:
         if melspec.ndim == 3:
             melspec = np.expand_dims(melspec, axis=-1)
 
-        res = cast("list[NDArray[np.float32]]", self.embedding_session.run(None, {'input_1': melspec}))[0]  # pyright: ignore[reportUnknownMemberType]
+        res = cast("list[NDArray[np.float32]]", self.embedding_session.run(None, {'input_1': melspec}))[0]
         return np.reshape(res, (melspec.shape[0], 96))
 
     def _get_embeddings(self, x: NDArray[np.float32] | NDArray[np.int16], window_size: int = 76, step_size: int = 8) -> NDArray[np.float32]:
@@ -334,13 +334,13 @@ class WakeWordDetector:
                 logger.error("Required model file not found: %s", p)
                 raise FileNotFoundError(f"Wake word model file not found: {p}")
 
-        opts = ort.SessionOptions()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        opts = ort.SessionOptions()
         opts.inter_op_num_threads = 1
         opts.intra_op_num_threads = 1
 
-        self._melspec_sess = ort.InferenceSession(str(melspec_path), sess_options=opts, providers=["CPUExecutionProvider"])  # pyright: ignore[reportUnknownArgumentType]
-        self._embedding_sess = ort.InferenceSession(str(embedding_path), sess_options=opts, providers=["CPUExecutionProvider"])  # pyright: ignore[reportUnknownArgumentType]
-        self._ww_sess = ort.InferenceSession(str(model_path), sess_options=opts, providers=["CPUExecutionProvider"])  # pyright: ignore[reportUnknownArgumentType]
+        self._melspec_sess = ort.InferenceSession(str(melspec_path), sess_options=opts, providers=["CPUExecutionProvider"])
+        self._embedding_sess = ort.InferenceSession(str(embedding_path), sess_options=opts, providers=["CPUExecutionProvider"])
+        self._ww_sess = ort.InferenceSession(str(model_path), sess_options=opts, providers=["CPUExecutionProvider"])
 
         self._preprocessor = ONNXAudioFeatures(self._melspec_sess, self._embedding_sess)
         self._prediction_count = 0
@@ -509,10 +509,10 @@ class WakeWordDetector:
                     features = self._preprocessor.get_features(16)
 
                     # Predict score
-                    inputs = self._ww_sess.get_inputs()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                    ww_input_name = str(inputs[0].name)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
-                    outputs = self._ww_sess.run(None, {ww_input_name: features})  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                    score = float(outputs[0][0][0])  # pyright: ignore[reportIndexIssue, reportUnknownArgumentType]
+                    inputs = self._ww_sess.get_inputs()
+                    ww_input_name = str(inputs[0].name)
+                    outputs = self._ww_sess.run(None, {ww_input_name: features})
+                    score = float(outputs[0][0][0])  # pyright: ignore[reportIndexIssue]
 
                     self._prediction_count += 1
                     if self._prediction_count < 5:

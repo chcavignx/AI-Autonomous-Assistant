@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+"""Integration test: Audio Stream Open/Close.
+
+Tests that audio streams can be opened, used, and closed safely.
+Validates codec configuration and frame buffer sizing.
+
+Run with:
+  python examples/audio/test_stream_open_close.py
+"""
+
+import logging
+import sys
+from pathlib import Path
+
+import numpy as np
+
+# Ensure repo root is accessible
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from src.audio.audio_utils import (
+    open_input_stream_with_fallback,
+    create_input_stream,
+    create_output_stream,
+    get_audio_backend,
+    get_chunk_frames,
+    get_default_input_device,
+    get_default_output_device,
+)
+from src.utils.config import load_config
+
+app_name = 'test_stream_open_close'
+logger = logging.getLogger(app_name)
+
+def test_input_stream_open_close() -> bool | None:
+    """Test opening and closing an input stream."""
+    config = load_config()
+    _ = get_audio_backend()
+    device = get_default_input_device()
+
+    if device is None:
+        return False
+
+    # Try common sample rates for input
+    sample_rate = None
+    stream_opened = None
+    for sr in [44100, 48000, 22050, 16000, 8000]:
+        try:
+            stream_opened = open_input_stream_with_fallback(
+                rate=sr,
+                chunk_ms=config.audio.input_chunk_ms,
+                device_index=device,
+            )
+            if stream_opened and stream_opened.stream.start():
+                stream_opened.stream.close()
+                sample_rate = sr
+                break
+        except (OSError, ValueError, ImportError):
+            continue
+    if sample_rate is None:
+        return False
+
+    chunk_frames = get_chunk_frames(sample_rate, config.audio.input_chunk_ms)
+
+    stream = None
+    try:
+        # Open stream
+        stream = create_input_stream(
+            rate=sample_rate,
+            chunk_frames=chunk_frames,
+            device_index=device,
+        )
+        success = stream.start()
+        assert success, "Failed to start stream"
+
+        # Verify stream is active
+        assert stream.active, "Stream is not active"
+
+        # Read one chunk with retry loop to allow buffer initialization
+        import time
+        data = None
+        start_time = time.time()
+        while time.time() - start_time < 2.0:
+            data = stream.read(chunk_frames)
+            if data is not None:
+                break
+            time.sleep(0.1)
+
+        assert data is not None, "No data read from stream (timed out after 2s)"
+        assert len(data) > 0, "Empty data read from stream"
+
+        # Stop stream
+        stream.stop()
+
+        # Verify stream is stopped
+        assert not stream.active, "Stream is still active after stop"
+
+        return True
+
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return False
+    finally:
+        if stream:
+            stream.close()
+
+
+def test_output_stream_open_close() -> bool | None:
+    """Test opening and closing an output stream."""
+    _ = load_config()
+    _ = get_audio_backend()
+    device = get_default_output_device()
+
+    if device is None:
+        return False
+
+    sample_rate = 44100
+    chunk_frames = 512
+
+    stream = None
+    try:
+        # Open stream
+        stream = create_output_stream(
+            rate=sample_rate,
+            chunk_frames=chunk_frames,
+            device_index=device,
+        )
+        success = stream.start()
+        assert success, "Failed to start stream"
+
+        # Verify stream is active
+        assert stream.active, "Stream is not active"
+
+        # Write silence
+        silence = np.zeros(chunk_frames, dtype=np.float32)
+        stream.write(silence)
+
+        # Stop stream
+        stream.stop()
+
+        # Verify stream is stopped
+        assert not stream.active, "Stream is still active after stop"
+
+        return True
+
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return False
+    finally:
+        if stream:
+            stream.close()
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    success1 = test_input_stream_open_close()
+    success2 = test_output_stream_open_close()
+
+    all_passed = success1 and success2
+    logger.info(f"Stream open/close test {'passed' if all_passed else 'failed'}")
+    sys.exit(0 if all_passed else 1)

@@ -3,8 +3,7 @@
 
 import pathlib
 import sys
-
-import openwakeword
+import urllib.request
 
 # Add project root to sys.path
 root_path = pathlib.Path(__file__).resolve().parents[3]
@@ -16,13 +15,23 @@ from src.utils.config import config
 # Target directory
 CACHE_DIR = config.wake.download_path
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
-# One-time download of all pre-trained models (or only select models)
 
 
 def run() -> None:
-    openwakeword.utils.download_models(
-        model_names=["hey_jarvis_v0.1"], target_directory=CACHE_DIR
-    )
+    models = {
+        "melspectrogram.onnx": "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/melspectrogram.onnx",
+        "embedding_model.onnx": "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/embedding_model.onnx",
+        "hey_jarvis_v0.1.onnx": "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/hey_jarvis_v0.1.onnx",
+    }
+
+    for model_name, url in models.items():
+        dest = CACHE_DIR / model_name
+        if dest.exists():
+            print(f"{model_name} already exists at {dest}, skipping.")
+        else:
+            print(f"Downloading {model_name} from {url}...")
+            urllib.request.urlretrieve(url, dest)
+            print(f"Successfully downloaded {model_name} to {dest}.")
 
 
 if __name__ == "__main__":

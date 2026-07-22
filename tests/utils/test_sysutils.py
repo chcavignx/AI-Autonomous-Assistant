@@ -118,3 +118,31 @@ def test_detect_raspberry_pi_model_oserror(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(pathlib.Path, "read_text", fake_read_text)
 
     assert sysutils.detect_raspberry_pi_model() is False
+
+
+def test_get_cpu_usage_percent(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = []
+
+    class DummyPsutil:
+        @staticmethod
+        def cpu_percent(interval: float = 0.0) -> float:
+            calls.append(interval)
+            return 45.6
+
+    monkeypatch.setattr(sysutils, "psutil", DummyPsutil)
+    assert sysutils.get_cpu_usage_percent(interval=0.1) == 45.6
+    assert calls == [0.1]
+
+
+def test_get_cpu_temperature_c_thermal_zone(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_read_text(self: pathlib.Path, encoding: str | None = None) -> str:
+        assert self == pathlib.Path("/sys/class/thermal/thermal_zone0/temp")
+        return "48123\n"
+
+    def fake_exists(self: pathlib.Path) -> bool:
+        return True
+
+    monkeypatch.setattr(pathlib.Path, "exists", fake_exists)
+    monkeypatch.setattr(pathlib.Path, "read_text", fake_read_text)
+
+    assert sysutils.get_cpu_temperature_c() == 48.123

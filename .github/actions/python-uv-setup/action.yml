@@ -4,7 +4,7 @@ inputs:
   python-version:
     description: Python version to install
     required: false
-    default: "3.11.6"
+    default: "3.13.2"
   sync-flags:
     description: Extra flags for uv sync (e.g., --locked --group test)
     required: false
@@ -48,7 +48,7 @@ runs:
             SUDO=""
         fi
         $SUDO apt-get update
-        $SUDO apt-get install -y ffmpeg portaudio19-dev alsa-utils
+        $SUDO apt-get install -y ffmpeg portaudio19-dev alsa-utils libcap-dev
 
     - name: Install the project dependencies
       shell: bash

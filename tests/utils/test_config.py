@@ -29,6 +29,7 @@ def test_path_config_properties() -> None:
     assert pc.cache_path == config.ROOT_DIR / ".cache"
     assert pc.models_path == config.ROOT_DIR / ".cache" / "models"
     assert pc.models_audio_path == config.ROOT_DIR / ".cache" / "audio" / "models"
+    assert pc.models_vision_path == config.ROOT_DIR / ".cache" / "vision" / "models"
 
 
 def test_asr_config_defaults() -> None:
@@ -166,6 +167,43 @@ def test_platform_config_cpu_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     assert platform.cpu_cores == 4
 
 
+def test_camera_config_defaults() -> None:
+    camera = config.CameraConfig()
+    assert camera.camera_index == 0
+    assert camera.frame_width == 1080
+    assert camera.frame_height == 720
+    assert camera.format == "RGB888"
+    assert camera.lores_frame_width == 640
+    assert camera.lores_frame_height == 480
+    assert camera.lores_format == "YUV420"
+
+
+def test_vision_config_defaults() -> None:
+    vision = config.VisionConfig()
+    assert vision.object_model_type == "yolo"
+    assert vision.object_model_name == "yolo26n.onnx"
+    assert vision.object_model_path is None
+    assert isinstance(vision.camera, config.CameraConfig)
+
+
+def test_vision_config_full_model_path_default() -> None:
+    vision = config.VisionConfig()
+    expected = config.ROOT_DIR / ".cache" / "vision" / "models" / "yolo" / "yolo26n.onnx"
+    assert vision.object_model_full_path == expected
+
+
+def test_vision_config_full_model_path_with_file() -> None:
+    vision = config.VisionConfig(object_model_path="custom/model.onnx")
+    expected = config.ROOT_DIR / "custom" / "model.onnx"
+    assert vision.object_model_full_path == expected
+
+
+def test_vision_config_full_model_path_with_directory() -> None:
+    vision = config.VisionConfig(object_model_path="custom")
+    expected = config.ROOT_DIR / "custom" / "yolo" / "yolo26n.onnx"
+    assert vision.object_model_full_path == expected
+
+
 def test_config_init() -> None:
     cfg = config.Config()
     assert isinstance(cfg.paths, config.PathConfig)
@@ -175,6 +213,7 @@ def test_config_init() -> None:
     assert isinstance(cfg.vad, config.VADConfig)
     assert isinstance(cfg.audio, config.AudioConfig)
     assert isinstance(cfg.platform, config.PlatformConfig)
+    assert isinstance(cfg.vision, config.VisionConfig)
 
 
 def test_config_properties() -> None:
