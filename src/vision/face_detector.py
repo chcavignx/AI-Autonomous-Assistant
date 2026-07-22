@@ -43,12 +43,13 @@ class InsightFaceDetector(BaseDetector):
         model_path = self.cfg.vision.face_detector_model_path
 
         if not pathlib.Path(model_path).exists():
+            logger.error("Face detector model not found at %s", model_path)
             msg = f"Face detector model not found at {model_path}"
             logger.error(msg)
-            raise RuntimeError(msg)
+            raise FileNotFoundError(msg)
 
         self.app = FaceAnalysis(
-            name=self.cfg.vision.face_model_name,
+            name=model_path,
             root=model_path.parent,
             providers=["CPUExecutionProvider"],
         )
