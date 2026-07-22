@@ -19,10 +19,13 @@ def _make_frame() -> np.ndarray:
 # ---------------------------------------------------------------------------
 
 
+@patch("src.vision.face_detector.pathlib.Path.exists", return_value=True)
 @patch("src.vision.face_detector.FaceAnalysis")
 @patch("src.vision.face_recognizer.get_model")
 @patch("cv2.CascadeClassifier")
-def test_cascade_backend_no_faces(mock_clf_cls: MagicMock, mock_get_model: MagicMock, mock_fa: MagicMock) -> None:
+def test_cascade_backend_no_faces(
+    mock_clf_cls: MagicMock, mock_get_model: MagicMock, mock_fa: MagicMock, mock_exists: MagicMock
+) -> None:
     """Cascade detector with no detections returns empty list."""
     mock_clf = MagicMock()
     mock_clf.empty.return_value = False
@@ -37,10 +40,13 @@ def test_cascade_backend_no_faces(mock_clf_cls: MagicMock, mock_get_model: Magic
     assert faces == []
 
 
+@patch("src.vision.face_detector.pathlib.Path.exists", return_value=True)
 @patch("src.vision.face_detector.FaceAnalysis")
 @patch("src.vision.face_recognizer.get_model")
 @patch("cv2.CascadeClassifier")
-def test_cascade_backend_with_faces(mock_clf_cls: MagicMock, mock_get_model: MagicMock, mock_fa: MagicMock) -> None:
+def test_cascade_backend_with_faces(
+    mock_clf_cls: MagicMock, mock_get_model: MagicMock, mock_fa: MagicMock, mock_exists: MagicMock
+) -> None:
     """Cascade detector returns face boxes when cascade fires."""
     mock_clf = MagicMock()
     mock_clf.empty.return_value = False
@@ -69,9 +75,10 @@ def test_cascade_backend_with_faces(mock_clf_cls: MagicMock, mock_get_model: Mag
 # ---------------------------------------------------------------------------
 
 
+@patch("src.vision.face_detector.pathlib.Path.exists", return_value=True)
 @patch("src.vision.face_detector.FaceAnalysis")
 @patch("src.vision.face_recognizer.get_model")
-def test_insightface_backend(mock_get_model: MagicMock, mock_fa: MagicMock) -> None:
+def test_insightface_backend(mock_get_model: MagicMock, mock_fa: MagicMock, mock_exists: MagicMock) -> None:
     """Insightface backend directly queries face_recognizer.recognize."""
     mock_app = MagicMock()
     mock_fa.return_value = mock_app
@@ -99,10 +106,13 @@ def test_insightface_backend(mock_get_model: MagicMock, mock_fa: MagicMock) -> N
 # ---------------------------------------------------------------------------
 
 
+@patch("src.vision.face_detector.pathlib.Path.exists", return_value=True)
 @patch("src.vision.face_detector.FaceAnalysis")
 @patch("src.vision.face_recognizer.get_model")
 @patch("cv2.CascadeClassifier")
-def test_unknown_backend_fallback(mock_clf_cls: MagicMock, mock_get_model: MagicMock, mock_fa: MagicMock) -> None:
+def test_unknown_backend_fallback(
+    mock_clf_cls: MagicMock, mock_get_model: MagicMock, mock_fa: MagicMock, mock_exists: MagicMock
+) -> None:
     """Unknown detector_type falls back to cascade."""
     mock_clf = MagicMock()
     mock_clf.empty.return_value = False
@@ -155,9 +165,10 @@ def test_hailo_backend_lazy_load(mock_fa: MagicMock) -> None:
 # ---------------------------------------------------------------------------
 
 
+@patch("src.vision.face_detector.pathlib.Path.exists", return_value=True)
 @patch("src.vision.face_detector.FaceAnalysis")
 @patch("src.vision.face_recognizer.get_model")
-def test_imx500_backend_initialization(mock_get_model: MagicMock, mock_fa: MagicMock) -> None:
+def test_imx500_backend_initialization(mock_get_model: MagicMock, mock_fa: MagicMock, mock_exists: MagicMock) -> None:
     """imx500 backend initializes correctly and sets detector to None."""
     mock_fa.return_value = MagicMock()
 
