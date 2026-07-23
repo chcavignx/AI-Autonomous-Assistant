@@ -80,7 +80,7 @@ The current TTS stack in `src/audio/tts.py` is built around a single offline pat
 
 - Text input via the TTS engine API
 - Voice synthesis with Piper (either Python API or CLI)
-- Audio playback with PyAudio
+- Audio playback with sounddevice (via audio_utils)
 
 The engine uses the `piper-tts` Python package for the default mode and supports alternative Piper CLI usage.
 
@@ -101,7 +101,7 @@ Default TTS settings come from `src/utils/config.py`:
 1. `TTSEngine.speak()` queues text for synthesis.
 2. A background playback thread consumes the queue.
 3. Piper generates WAV audio either through the Python API or the CLI subprocess.
-4. The audio is played back through PyAudio.
+4. The audio is played back through sounddevice (via audio_utils).
 
 The implementation is non-blocking by default, so the assistant can keep listening while speech is queued.
 

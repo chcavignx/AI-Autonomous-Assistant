@@ -49,9 +49,9 @@ Here is a prioritization proposed for the context: Raspberry Pi 5, Hailo-8L, NVM
 ### Proposed Sequence to Meet Constraints and Integrate Modules
 
 - **Audio Modules**:
-  1. Confirm the USB microphone and speaker path with [audio_usb_test.md](audio_usb_test.md).
-  2. Validate offline speech recognition with [STT_offline.md](STT_offline.md).
-  3. Validate offline text-to-speech with [TTS_offline.md](TTS_offline.md).
+  1. Confirm the USB microphone and speaker path with [AUDIO_USB_TEST.md](AUDIO_USB_TEST.md).
+  2. Validate offline speech recognition with [STT_OFFLINE.md](STT_OFFLINE.md).
+  3. Validate offline text-to-speech with [TTS_OFFLINE.md](TTS_OFFLINE.md).
   4. Verify the integrated wake-word, ASR, and TTS loop with `examples/VAD/voice_agent_offline.py`.
 - **Follow with Vision Modules**:
     1. Start with facial recognition (simpler than object recognition).
@@ -63,20 +63,30 @@ Here is a prioritization proposed for the context: Raspberry Pi 5, Hailo-8L, NVM
 ### Sequenced Guides for Different Modules
 
 - **Audio Modules**
-    1. [USB microphone and speaker test](audio_usb_test.md)
-    2. [Offline Speech Recognition (STT)](STT_offline.md)
-    3. [Offline Text-to-Speech (TTS)](TTS_offline.md)
-    4. [Voice stack and VAD models](STS_VAD_models.md)
+    1. [USB microphone and speaker test](AUDIO_USB_TEST.md)
+    2. [Offline Speech Recognition (STT)](STT_OFFLINE.md)
+    3. [Offline Text-to-Speech (TTS)](TTS_OFFLINE.md)
+    4. [Voice stack and VAD models](STS_VAD_MODELS.md)
     5. [Offline Speech-to-Speech demo](../examples/VAD/voice_agent_offline.md)
         Demo application that listens for a wake word, transcribes the next utterance, generates a keyword response, and speaks it back (`examples/VAD/voice_agent_offline.py`)
 
 - **Vision Modules**
-    1. [Facial Recognition Guide](facial_recognition.md **!TO DO!**)
-    2. [Object Recognition Guide](object_recognition.md **!TO DO!**)
-    3. [Object Recognition demo](object_recognition_demo.md **!TO DO!**)
-    Demo application that detects and labels objects in real-time. (**!TO DO!**)
+    1. [Vision Pipeline Architecture & 3-Phase Guide](VISION_PIPELINE.md)
+        Detailed overview of the 3-phase pipeline (Detection, Alignment & Embedding, Identification), codebase architecture under `src/vision/`, and hardware choices.
+    2. [IMX500, InsightFace & YOLO Integration Guide](IMX500_INSIGHTFACE_AND_YOLO.md)
+        Complete guide for split hybrid architecture using Sony IMX500 AI Camera on-sensor detection + Host InsightFace `buffalo_l` recognition.
+    3. [SOTA Facial Recognition & RPi5 Hardware Roadmap](SOTA_FACERECON.md)
+        Comparative benchmark analysis across Haar Cascade, OpenCV DNN, IMX500 AI Camera, and Hailo-8L AI HAT+.
+    4. [YOLO & NCNN CPU Optimization Guide](YOLO_NCNN_OPTIMIZATION.md)
+        Optimizing YOLO26/11 for CPU-only inference using NCNN on ARM Cortex-A76.
+    5. [AI Acceleration Roadmap & Comparative Study](AI_ROADMAP_COMPARATIVE.md)
+        4-phase development roadmap comparing CPU baseline, Hailo-8L NPU, and Sony IMX500 smart camera performance.
 
 - **Module Integration**
+    1. Voice + Vision multimodal assistant orchestration (`src/vision/face_in_frame.py` + `src/audio/asr.py` + `src/audio/tts.py`).
 
 - **Design Decision**
-  1. Voice Agent Solution and Architecture: [Voice Agent Offline Solution](STS_VAD_models.md)
+  1. Voice Agent Solution and Architecture: [Voice Agent Offline Solution](STS_VAD_MODELS.md)
+  2. Vision Agent Solution and Architecture: [Vision Pipeline Architecture & 3-Phase Guide](VISION_PIPELINE.md)
+  3. Hybrid Sensor-Host Vision Strategy: [IMX500, InsightFace & YOLO Guide](IMX500_INSIGHTFACE_AND_YOLO.md)
+  4. Hardware Acceleration & Benchmarking Roadmap: [AI Acceleration Roadmap & Comparative Study](AI_ROADMAP_COMPARATIVE.md)

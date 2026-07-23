@@ -116,7 +116,7 @@ Voice Activity Detection (VAD) is a critical component in modern speech processi
 
 **Architecture Components**:
 
-1. **Wake Word Detection**: SpeechRecognition library with energy-based VAD
+1. **Wake Word Detection**: ONNX Runtime executing pre-trained openWakeWord models
 2. **Precise VAD**: Silero VAD for accurate speech segmentation
 3. **Main STT**: Faster-Whisper with optimized settings
 4. **TTS Integration**: Piper TTS for complete offline operation
@@ -179,7 +179,7 @@ Key Details:
 - Audio feature extraction (log-mel spectrogram and Google speech embeddings) is handled directly via `ONNXAudioFeatures` to reproduce openWakeWord's preprocessing pipeline.
 - Performs inference using three chained ONNX sessions: `melspectrogram.onnx`, `embedding_model.onnx`, and the wake word classifier `.onnx` model.
 - Runs fully offline.
-- Captures microphone input with PyAudio.
+- Captures microphone input with sounddevice (via audio_utils).
 - Expects 16 kHz audio internally, resampling device audio when necessary.
 - Uses a cooldown to avoid repeated triggers.
 
@@ -187,7 +187,7 @@ Key Details:
 
 `ASREngine` combines VAD and STT in a single module:
 
-- PyAudio captures microphone chunks
+- sounddevice captures microphone chunks (via audio_utils)
 - **Silero VAD** detects speech vs silence — the primary segmentation engine
 - **Faster-Whisper** is the default transcription backend (OpenAI Whisper supported as alternate)
 - Falls back to a simple energy-based detector if Silero VAD is not available
@@ -197,7 +197,7 @@ Key Details:
 `TTSEngine` uses **Piper**:
 
 - Piper Python API is the default path; CLI mode also supported
-- Playback handled through PyAudio
+- Playback handled through sounddevice (via audio_utils)
 - Speech is queued so synthesis stays non-blocking
 
 ### Default Configuration
