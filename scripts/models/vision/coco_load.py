@@ -14,7 +14,7 @@ from pathlib import Path
 from ultralytics.utils import ASSETS_URL
 from ultralytics.utils.downloads import download
 
-NEED_COCA_DATA = False
+NEED_COC0_DATA = False
 # Add project root to sys.path
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
@@ -23,7 +23,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.utils.config import config
 
 DRY_RUN = os.getenv("DRY_RUN", "0") == "1"
-
+#see https://github.com/ultralytics/ultralytics/blob/main/ultralytics/cfg/datasets/coco.yaml.
 DATASET_DIR = config.paths.data_path / "dataset_vision"
 COCO_YAML_URL = "https://raw.githubusercontent.com/ultralytics/ultralytics/main/ultralytics/cfg/datasets/coco.yaml"
 COCO_DATA_DIR = config.paths.dataset_vision_path
@@ -124,7 +124,7 @@ def run() -> None:
         "val": "http://images.cocodataset.org/zips/val2017.zip",    # 1G, 5k images
         "annotations": "http://images.cocodataset.org/annotations/annotations_trainval2017.zip", # 250MB
     }
-    if NEED_COCA_DATA:
+    if NEED_COC0_DATA:
         for name in ["train", "val"]:
             zip_name = f"{name}2017.zip"
             dest = DATASET_IMAGES_PATH / zip_name

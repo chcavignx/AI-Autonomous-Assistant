@@ -7,10 +7,10 @@ import logging.config
 import sys
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, ClassVar, cast
+from typing import cast
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .sysutils import detect_raspberry_pi_model, limit_cpu_for_multiprocessing
 
@@ -232,6 +232,13 @@ class PlatformConfig(PathConfig):
         _ = self.cpu_limit()
 
 
+class ModelResolution(BaseModel):
+    """Configuration for model resolution settings."""
+
+    width: int = 640
+    height: int = 640
+
+
 class CameraConfig(BaseModel):
     """Configuration for Camera settings."""
 
@@ -242,14 +249,12 @@ class CameraConfig(BaseModel):
     lores_frame_width: int = 640
     lores_frame_height: int = 480
     lores_format: str = "YUV420"
-    imx500_frame_width: int = 640
-    imx500_frame_height: int = 480
 
 
 class VisionConfig(PathConfig):
     """Configuration for Vision settings."""
 
-    model_config: ClassVar[dict[str, Any]] = {"populate_by_name": True}  # pyright: ignore[reportUndefinedVariable]
+    model_config = ConfigDict(populate_by_name=True)
 
     face_detector_type: str = "cascade"  # "cascade", "insightface", "imx500"
     face_model_name: str = "haarcascade_frontalface_default.xml"  # "buffalo_l" for insightface
@@ -266,6 +271,7 @@ class VisionConfig(PathConfig):
     object_model_type: str = "yolo"  # "yolo" (CPU), "yolo_hailo", "yolo_imx500", "libreyolo" (CPU)
     object_model_name: str = "yolo26n.onnx"
     object_model_path: str | None = None
+    object_label_path: str | None = None
     object_device: str = "cpu"  # CPU or "hailo"
     object_inference_framework: str = "onnx"  # "hef" for Hailo
     object_nms: bool = False  # Enable NMS in Python (after export)
@@ -277,7 +283,64 @@ class VisionConfig(PathConfig):
     face_dataset_path: str | None = None
     object_dataset_path: str | None = None
 
+    model_resolutions: dict[str, ModelResolution] = Field(
+        default_factory=lambda: {
+            "LibreYOLOXn.onnx": ModelResolution(width=416, height=416),
+            "LibreYOLOXn": ModelResolution(width=416, height=416),
+            "yolo26n.onnx": ModelResolution(width=640, height=640),
+            "yolo11n.onnx": ModelResolution(width=640, height=640),
+            "buffalo_l": ModelResolution(width=640, height=640),
+            "imx500": ModelResolution(width=640, height=480),
+            "default": ModelResolution(width=1080, height=720),
+        }
+    )
+
     camera: CameraConfig = CameraConfig()
+
+    def get_model_resolution(self, model_name: str | None = None) -> tuple[int, int]:
+        """Resolve (width, height) resolution for a specific model or current vision model setting.
+
+        Args:
+            model_name: Optional model name string. If None, checks object_model_name, face_model_name,
+                        or object_model_type/face_detector_type.
+
+        Returns:
+            Tuple of (width, height).
+
+        """
+        candidates: list[str] = []
+        if model_name:
+            candidates.append(model_name)
+        else:
+            if self.object_model_name:
+                candidates.append(self.object_model_name)
+            if self.face_model_name:
+                candidates.append(self.face_model_name)
+            if self.object_model_type:
+                candidates.append(self.object_model_type)
+            if self.face_detector_type:
+                candidates.append(self.face_detector_type)
+
+        for candidate in candidates:
+            # 1. Exact match
+            if candidate in self.model_resolutions:
+                res = self.model_resolutions[candidate]
+                return res.width, res.height
+
+            # 2. Case-insensitive key or substring match
+            cand_lower = candidate.lower()
+            for key, res in self.model_resolutions.items():
+                key_lower = key.lower()
+                if key_lower == cand_lower or key_lower in cand_lower or cand_lower in key_lower:
+                    return res.width, res.height
+
+        # Fallback to default in table if available, else camera config defaults
+        if "default" in self.model_resolutions:
+            res = self.model_resolutions["default"]
+            return res.width, res.height
+        width = getattr(self.camera, "frame_width", 1080)
+        height = getattr(self.camera, "frame_height", 720)
+        return width, height
 
     @property
     def object_model_full_path(self) -> Path:
@@ -301,6 +364,14 @@ class VisionConfig(PathConfig):
             return (self.models_vision_path / self.object_model_type / f"{base_name}_ncnn_model").resolve()
         msg = f"Unknown inference framework: {self.object_inference_framework}"
         raise ValueError(msg)
+
+    @property
+    def object_label_full_path(self) -> Path | None:
+        """The resolved full path to the object detection labels file."""
+        if self.object_label_path:
+            p = ROOT_DIR / self.object_label_path
+            return p.resolve()
+        return None
 
     @property
     def face_detector_model_path(self) -> Path:

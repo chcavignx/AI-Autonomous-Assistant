@@ -8,7 +8,7 @@ import threading
 import time
 from typing import (
     TYPE_CHECKING,
-    Any,  # pyright: ignore[reportDuplicateImport]
+    Any,
 )
 
 import cv2
@@ -31,12 +31,13 @@ class ThreadedCamera:
     thread: threading.Thread | None  # pyright: ignore[reportRedeclaration]
     frame: np.ndarray[Any, Any] | Any
 
-    def __init__(self, cfg: Config) -> None:
+    def __init__(self, cfg: Config, model_name: str | None = None) -> None:
         """Initialize the threaded camera."""
         self.cfg = cfg
         self.camera_index = cfg.vision.camera.camera_index
-        self.frame_width = cfg.vision.camera.frame_width
-        self.frame_height = cfg.vision.camera.frame_height
+        width, height = cfg.vision.get_model_resolution(model_name)
+        self.frame_width = width
+        self.frame_height = height
 
         self.use_picamera2 = False
         self.picam2 = None
@@ -183,8 +184,14 @@ class PiCamera:
         """Return the string representation of camera_info."""
         return str(self.camera_info)
 
-    def start(self, width: int = 640, height: int = 480, video_format: str = "XRGB8888") -> None:
+    def start(self, width: int | None = None, height: int | None = None, video_format: str = "XRGB8888") -> None:
         """Configure the video configuration and start the stream."""
+        if width is None or height is None:
+            from src.utils.config import config
+
+            w, h = config.vision.get_model_resolution()
+            width = width if width is not None else w
+            height = height if height is not None else h
         config = self._cam.create_video_configuration(main={"size": (width, height), "format": video_format})
         self._cam.configure(config)
         self._cam.start()  # type: ignore[attr-defined]

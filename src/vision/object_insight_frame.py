@@ -75,27 +75,15 @@ class ObjectInsightFrame:
 
         detections: list[DetectionDict] = []
         if results is not None:
-            if hasattr(results, "boxes") and results.boxes is not None and not isinstance(results.boxes, list):
-                # Ultralytics Results
-                for box in results.boxes:
-                    xyxy = box.xyxy[0].tolist() if hasattr(box.xyxy[0], "tolist") else box.xyxy[0]
-                    conf = float(box.conf[0])
-                    cls = int(box.cls[0])
-                    # Handle dummy model names if needed
-                    model = getattr(self.detector, "model", None)
-                    label = model.names[cls] if model and hasattr(model, "names") and cls in model.names else str(cls)
-                    detections.append(
-                        {
-                            "box": [int(xyxy[0]), int(xyxy[1]), int(xyxy[2]), int(xyxy[3])],
-                            "score": conf,
-                            "class_id": cls,
-                            "label": label,
-                        }
-                    )
-            elif hasattr(results, "detections"):
+            if hasattr(results, "detections") and isinstance(getattr(results, "detections", None), list):
                 # DummyResults from IMX500
-                intrinsics = getattr(self.detector, "intrinsics", None)
-                labels = intrinsics.labels if intrinsics and intrinsics.labels else []
+                if hasattr(self.detector, "get_labels"):
+                    labels = self.detector.get_labels()
+                else:
+                    intrinsics = getattr(self.detector, "intrinsics", None)
+                    labels = intrinsics.labels if intrinsics and intrinsics.labels else []
+                    if intrinsics and getattr(intrinsics, "ignore_dash_labels", False):
+                        labels = [lbl for lbl in labels if lbl and lbl != "-"]
                 for d in results.detections:
                     label_idx = int(d.cls)
                     label = labels[label_idx] if label_idx < len(labels) else str(label_idx)
@@ -104,6 +92,29 @@ class ObjectInsightFrame:
                             "box": [int(d.x1), int(d.y1), int(d.x2), int(d.y2)],
                             "score": float(d.score),
                             "class_id": label_idx,
+                            "label": label,
+                        }
+                    )
+            elif hasattr(results, "boxes") and results.boxes is not None:
+                # Ultralytics Results
+                for box in results.boxes:
+                    xyxy = box.xyxy[0].tolist() if hasattr(box.xyxy[0], "tolist") else box.xyxy[0]
+                    conf = float(box.conf[0])
+                    cls = int(box.cls[0])
+                    # Handle dummy model names or missing keys safely
+                    model = getattr(self.detector, "model", None)
+                    names = getattr(model, "names", None)
+                    if (names and isinstance(names, dict) and cls in names) or (
+                        names and isinstance(names, (list, tuple)) and 0 <= cls < len(names)
+                    ):
+                        label = names[cls]
+                    else:
+                        label = str(cls)
+                    detections.append(
+                        {
+                            "box": [int(xyxy[0]), int(xyxy[1]), int(xyxy[2]), int(xyxy[3])],
+                            "score": conf,
+                            "class_id": cls,
                             "label": label,
                         }
                     )

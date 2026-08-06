@@ -44,6 +44,25 @@ def test_threaded_camera_init_and_read() -> None:
         mock_cap.release.assert_called_once()
 
 
+def test_threaded_camera_model_resolution() -> None:
+    """Test ThreadedCamera configures frame width and height from model resolution table."""
+    mock_cap = MagicMock()
+    mock_cap.isOpened.return_value = True
+    mock_cap.read.return_value = (True, np.ones((10, 10, 3), dtype=np.uint8))
+
+    cfg = Config()
+    cfg.vision.object_model_name = "LibreYOLOXn.onnx"
+
+    with patch("cv2.VideoCapture", return_value=mock_cap):
+        threaded_cam = camera.ThreadedCamera(cfg)
+        threaded_cam.started = False
+        if threaded_cam.thread:
+            threaded_cam.thread.join(timeout=1.0)
+
+        assert threaded_cam.frame_width == 416
+        assert threaded_cam.frame_height == 416
+
+
 def test_threaded_camera_read_none() -> None:
     """Test ThreadedCamera read returning None when not grabbed."""
     mock_cap = MagicMock()

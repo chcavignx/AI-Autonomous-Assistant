@@ -87,28 +87,39 @@ class VideoCapture:
         """Initialize modular frame processors."""
         try:
             imx500_instance = getattr(self.camera, "imx500", None)
+            picam2_instance = getattr(self.camera, "picam2", None)
 
             # Initialize Object Processor
             if self.cfg.vision.object_model_type == "yolo_imx500":
-                from src.vision.yolo_imx500 import Imx500Detector
+                try:
+                    from src.vision.yolo_imx500 import Imx500Detector
 
-                obj_detector = Imx500Detector(imx500=imx500_instance)
-                self.object_processor = ObjectInsightFrame(self.cfg, detector=obj_detector)
+                    obj_detector = Imx500Detector(imx500=imx500_instance, picam2=picam2_instance)
+                    self.object_processor = ObjectInsightFrame(self.cfg, detector=obj_detector)
+                except Exception as e:
+                    logger.warning("Failed to initialize IMX500 object processor, falling back to default: %s", e)
+                    self.object_processor = ObjectInsightFrame(self.cfg)
             else:
                 self.object_processor = ObjectInsightFrame(self.cfg)
 
             # Initialize Face Processor
             detector_type = self.cfg.vision.face_detector_type
             if detector_type == "imx500":
-                from src.vision.face_insight_pipeline import FaceInsightPipeline
+                try:
+                    from src.vision.face_insight_pipeline import FaceInsightPipeline
 
-                face_detector = FaceInsightPipeline(
-                    self.cfg,
-                    arcface_model_name=str(self.cfg.vision.post_processing_model_full_path),
-                    imx500=imx500_instance,
-                )
-                self.face_processor = FaceInFrame(self.cfg, detector_type=detector_type, face_recognizer=face_detector)
-                self.face_processor.detector = face_detector.detector
+                    face_detector = FaceInsightPipeline(
+                        self.cfg,
+                        arcface_model_name=str(self.cfg.vision.post_processing_model_full_path),
+                        imx500=imx500_instance,
+                    )
+                    self.face_processor = FaceInFrame(
+                        self.cfg, detector_type=detector_type, face_recognizer=face_detector
+                    )
+                    self.face_processor.detector = face_detector.detector
+                except Exception as e:
+                    logger.warning("Failed to initialize IMX500 face processor, falling back to default: %s", e)
+                    self.face_processor = FaceInFrame(self.cfg, detector_type="insightface")
             else:
                 self.face_processor = FaceInFrame(self.cfg, detector_type=detector_type)
 
@@ -224,13 +235,13 @@ class VideoCapture:
 
     def benchmark(self, iterations: int = 100) -> None:
         """Run a performance benchmark of the current model."""
-        if self.model is None or self.latest_frame is None:
+        if self.latest_frame is None:
             logger.warning("No model or frame available for benchmarking")
             return
 
         st = time.time()
         for _ in range(iterations):
-            self.model(self.latest_frame, verbose=False)
+            self.object_processor.process_frame(self.latest_frame, draw=False)
         et = time.time()
 
         elapsed_time: float = (et - st) / iterations

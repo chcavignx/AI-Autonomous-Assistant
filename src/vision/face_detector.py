@@ -102,12 +102,15 @@ class InsightFaceDetector(BaseDetector):
         return detections
 
 
+_imx500_w, _imx500_h = config.vision.get_model_resolution("imx500")
+
+
 @dataclass
 class Imx500Config:
     """Configuration for the IMX500 pipeline for on-sensor detection."""
 
-    frame_width: int = config.vision.camera.imx500_frame_width
-    frame_height: int = config.vision.camera.imx500_frame_height
+    frame_width: int = _imx500_w
+    frame_height: int = _imx500_h
 
 
 class Imx500Detector(BaseDetector):
