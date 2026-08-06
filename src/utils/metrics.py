@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import csv
-import typing
 from dataclasses import dataclass, field
 from time import perf_counter
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 # Re-exported for backward compatibility
 
@@ -75,8 +74,8 @@ class CsvLogger:
     """A logger for saving benchmark results in CSV format."""
 
     path: Path
-    file: typing.Any  # pyright: ignore[reportUndefinedVariable]
-    writer: typing.Any  # pyright: ignore[reportUndefinedVariable]
+    file: Any
+    writer: Any
     start: float
 
     def __init__(self, path: Path, headers: list[str]) -> None:

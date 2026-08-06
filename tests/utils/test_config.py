@@ -297,3 +297,17 @@ def test_load_config_yaml_none(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(pathlib.Path, "open", lambda self, mode, encoding: mock_file)
     cfg = config.load_config()
     assert isinstance(cfg, config.Config)
+
+
+def test_get_model_resolution() -> None:
+    cfg = config.Config()
+    # Test lookup for LibreYOLOXn
+    assert cfg.vision.get_model_resolution("LibreYOLOXn.onnx") == (416, 416)
+    assert cfg.vision.get_model_resolution("LibreYOLOXn") == (416, 416)
+
+    # Test lookup for yolo26n / buffalo_l
+    assert cfg.vision.get_model_resolution("yolo26n.onnx") == (640, 640)
+    assert cfg.vision.get_model_resolution("buffalo_l") == (640, 640)
+
+    # Test default fallback for unknown model
+    assert cfg.vision.get_model_resolution("unknown_model_xyz") == (1080, 720)

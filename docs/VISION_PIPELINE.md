@@ -200,7 +200,8 @@ vision:
   face_recognition_threshold: 0.40
   post_processing_enabled: true
   post_processing_model_full_path: "~/.insightface/models/buffalo_l/w600k_r50.onnx"
-  camera:
-    imx500_frame_width: 640
-    imx500_frame_height: 640
+  model_resolutions:
+    imx500:
+      width: 640
+      height: 480
 ```

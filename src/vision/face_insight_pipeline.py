@@ -54,8 +54,7 @@ class FaceInsightPipeline(BaseDetector):
             self.detector = InsightFaceDetector(self.cfg, det_size)
         else:
             logger.warning(
-                "FaceInsightPipeline instantiated with detector_type='%s', which is "
-                "not directly supported by this pipeline wrapper natively. Defaulting to InsightFace.",
+                "FaceInsightPipeline instantiated with detector_type='%s', which is not directly supported by this pipeline wrapper natively. Defaulting to InsightFace.",
                 self.detector_type,
             )
             self.detector = InsightFaceDetector(self.cfg, det_size)

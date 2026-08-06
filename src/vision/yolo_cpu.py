@@ -8,10 +8,13 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any, cast
 
 import cv2
+import numpy as np
+import onnxruntime as ort
 from ultralytics import YOLO
+from ultralytics.engine.results import Results
 
 # Ensure 'src' is in sys.path
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.resolve()))
@@ -19,13 +22,125 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.resolve()))
 from src.utils.config import Config, load_config
 from src.vision.base import BaseDetector, DetectionDict
 
-if TYPE_CHECKING:
-    import numpy as np
-    from ultralytics.engine.results import Results
-
 module_name = __name__
 lib_name = module_name.split(".")[1]
 logger = logging.getLogger(lib_name)
+
+
+class LibreYoloOnnxPredictor:
+    """ONNX Runtime fallback for LibreYOLO / YOLOX models when libreyolo package is not installed."""
+
+    def __init__(self, model_path: str, names: dict[int, str] | None = None) -> None:
+        """Initialize the YOLOX ONNX Runtime predictor.
+
+        Args:
+            model_path: Path to the ONNX model file.
+            names: Optional dictionary mapping class IDs to class names.
+
+        """
+        self.model_path = model_path
+        self.session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+        self.input_name = self.session.get_inputs()[0].name
+        self.names = names or {i: f"class_{i}" for i in range(80)}
+
+    def predict(
+        self,
+        source: np.ndarray,
+        conf: float = 0.25,
+        verbose: bool = False,
+        imgsz: tuple[int, int] | int = (416, 416),
+        rect: bool = False,
+        device: str = "cpu",
+    ) -> list[Results]:
+        """Run YOLOX ONNX inference on a BGR frame and return Ultralytics Results."""
+        h_orig, w_orig = source.shape[:2]
+        if isinstance(imgsz, (list, tuple)):
+            h_in, w_in = imgsz
+        else:
+            h_in = w_in = imgsz
+
+        # Letterbox resize
+        r = min(h_in / h_orig, w_in / w_orig)
+        rw, rh = round(w_orig * r), round(h_orig * r)
+        dw, dh = (w_in - rw) / 2, (h_in - rh) / 2
+
+        resized = cv2.resize(source, (rw, rh), interpolation=cv2.INTER_LINEAR)
+        padded = np.full((h_in, w_in, 3), 114, dtype=np.uint8)
+        top = round(dh - 0.1)
+        left = round(dw - 0.1)
+        padded[top : top + rh, left : left + rw] = resized
+
+        # BGR to RGB, HWC to CHW
+        t0 = time.time()
+        blob = padded.transpose(2, 0, 1)[::-1]
+        blob = np.ascontiguousarray(blob, dtype=np.float32) / 255.0
+        blob = np.expand_dims(blob, axis=0)
+        t1 = time.time()
+
+        outputs = self.session.run(None, {self.input_name: blob})
+        t2 = time.time()
+
+        preds: np.ndarray = cast("np.ndarray", outputs[0])
+        if preds.ndim == 3:
+            preds = preds[0]
+
+        # Decode YOLOX anchors
+        strides = [8, 16, 32]
+        grids = []
+        expanded_strides = []
+        for stride in strides:
+            hsize = h_in // stride
+            wsize = w_in // stride
+            xv, yv = np.meshgrid(np.arange(wsize), np.arange(hsize))
+            grid = np.stack((xv, yv), axis=-1).reshape(-1, 2)
+            grids.append(grid)
+            expanded_strides.append(np.full((grid.shape[0], 1), stride))
+
+        grid_cat = np.concatenate(grids, axis=0)
+        strides_cat = np.concatenate(expanded_strides, axis=0)
+
+        cxcy = (preds[:, :2] + grid_cat) * strides_cat
+        wh = np.exp(preds[:, 2:4]) * strides_cat
+
+        obj_conf = preds[:, 4:5]
+        cls_scores = preds[:, 5:]
+        scores = obj_conf * cls_scores
+
+        class_ids = np.argmax(scores, axis=1)
+        max_scores = np.max(scores, axis=1)
+
+        mask = max_scores >= conf
+        if not np.any(mask):
+            res = Results(orig_img=source, path=self.model_path, names=self.names, boxes=np.zeros((0, 6)))
+            res.speed = {"preprocess": (t1 - t0) * 1000, "inference": (t2 - t1) * 1000, "postprocess": 0.0}
+            res.save = lambda filename=None, **kwargs: cv2.imwrite(filename, res.plot()) if filename else None
+            return [res]
+
+        b_cxcy = cxcy[mask]
+        b_wh = wh[mask]
+        b_scores = max_scores[mask]
+        b_cls = class_ids[mask]
+
+        # Map back to original image resolution
+        x1 = (b_cxcy[:, 0] - b_wh[:, 0] / 2 - dw) / r
+        y1 = (b_cxcy[:, 1] - b_wh[:, 1] / 2 - dh) / r
+        x2 = (b_cxcy[:, 0] + b_wh[:, 0] / 2 - dw) / r
+        y2 = (b_cxcy[:, 1] + b_wh[:, 1] / 2 - dh) / r
+
+        boxes_for_nms = np.stack([x1, y1, x2 - x1, y2 - y1], axis=1).tolist()
+        indices = cv2.dnn.NMSBoxes(boxes_for_nms, b_scores.tolist(), float(conf), 0.45)
+
+        if len(indices) > 0:
+            idx = indices.flatten()
+            box_data = np.stack([x1[idx], y1[idx], x2[idx], y2[idx], b_scores[idx], b_cls[idx]], axis=1)
+        else:
+            box_data = np.zeros((0, 6))
+
+        t3 = time.time()
+        res = Results(orig_img=source, path=self.model_path, names=self.names, boxes=box_data)
+        res.speed = {"preprocess": (t1 - t0) * 1000, "inference": (t2 - t1) * 1000, "postprocess": (t3 - t2) * 1000}
+        res.save = lambda filename=None, **kwargs: cv2.imwrite(filename, res.plot()) if filename else None
+        return [res]
 
 
 class YoloCpuDetector(BaseDetector):
@@ -55,8 +170,9 @@ class YoloCpuDetector(BaseDetector):
         self.verbose = verbose
         if cfg is None:
             cfg = load_config()
-        self.conf_thres = conf_thres if conf_thres is not None else cfg.vision.object_recognition_threshold
-        self.model_path = str(model_path or cfg.vision.object_model_full_path)
+        self.cfg = cfg
+        self.conf_thres = conf_thres if conf_thres is not None else self.cfg.vision.object_recognition_threshold
+        self.model_path = str(model_path or self.cfg.vision.object_model_full_path)
         self.model = self._load_model(self.model_path)
 
     def _load_model(self, model_path: str) -> Any:
@@ -67,7 +183,8 @@ class YoloCpuDetector(BaseDetector):
 
                 return LibreYOLO(self.model_path)
             except ImportError:
-                logger.warning("libreyolo not installed, falling back to ultralytics YOLO")
+                logger.info("libreyolo package not installed, using ONNX Runtime YOLOX predictor")
+                return LibreYoloOnnxPredictor(self.model_path)
         return YOLO(self.model_path)
 
     def infer(self, frame_bgr: np.ndarray, metadata: dict | None = None) -> Results:
@@ -81,13 +198,59 @@ class YoloCpuDetector(BaseDetector):
             An Ultralytics Results object.
 
         """
-        results = self.model.predict(
-            source=frame_bgr,
-            conf=self.conf_thres,
-            verbose=self.verbose,
-            device="cpu",
-        )
-        return results[0]
+        res_w, res_h = self.cfg.vision.get_model_resolution(self.model_path)
+        is_libre = type(self.model).__module__.startswith("libreyolo") or isinstance(self.model, LibreYoloOnnxPredictor)
+
+        predict_kwargs = {
+            "source": frame_bgr,
+            "conf": self.conf_thres,
+            "imgsz": (res_h, res_w),
+            "device": "cpu",
+        }
+        if not is_libre:
+            predict_kwargs["verbose"] = self.verbose
+            predict_kwargs["rect"] = False
+
+        results = self.model.predict(**predict_kwargs)
+        res = results[0]
+        if not hasattr(res, "speed") or not res.speed:
+            res.speed = {"preprocess": 1.0, "inference": 1.0, "postprocess": 1.0}
+        if not hasattr(res, "save") or not callable(getattr(res, "save", None)):
+
+            def _save_fallback(filename: str | None = None, **kwargs: Any) -> None:
+                if not filename:
+                    return
+                img = None
+                if hasattr(res, "plot") and callable(getattr(res, "plot", None)):
+                    try:
+                        img = res.plot()
+                    except Exception:
+                        img = None
+                if img is None:
+                    for attr in ("orig_img", "img", "frame"):
+                        val = getattr(res, attr, None)
+                        if isinstance(val, np.ndarray):
+                            img = val
+                            break
+                if img is None:
+                    img = frame_bgr
+                if img is not None:
+                    cv2.imwrite(filename, img)
+
+            res.save = _save_fallback
+
+        if (
+            hasattr(res, "boxes")
+            and res.boxes is not None
+            and len(res.boxes) > 0
+            and hasattr(res, "names")
+            and isinstance(res.names, dict)
+        ):
+            for box in res.boxes:
+                cls_id = int(box.cls[0])
+                if cls_id not in res.names:
+                    res.names[cls_id] = str(cls_id)
+        return res
 
     def detect(self, frame: np.ndarray, metadata: dict | None = None) -> list[DetectionDict]:
         """Detect objects in a BGR frame and return standardized results.
@@ -178,11 +341,11 @@ class Detection:
 
 
 class Yolo26NcnnDetector(BaseDetector):
-    """Détecteur YOLO au format NCNN via Ultralytics.
+    """YOLO detector in NCNN format via Ultralytics.
 
-    - Modèle nano (n) recommandé pour le CPU Pi 5.
-    - YOLO est NMS-free : pas de NMS côté Python.
-    - On appelle directement le modèle NCNN exporté.
+    - Nano (n) model recommended for Raspberry Pi 5 CPU.
+    - YOLO is NMS-free: no NMS on the Python side.
+    - The exported NCNN model is called directly.
     """
 
     def __init__(self, cfg: Config | None = None, conf_thres: float | None = None) -> None:
@@ -204,8 +367,8 @@ class Yolo26NcnnDetector(BaseDetector):
             List of Detection objects.
 
         """
-        # Utiliser l'API low-level de Ultralytics pour passer un np.ndarray BGR
-        # On désactive l'affichage, la sauvegarde, et on demande une seule image.
+        # Use Ultralytics low-level API to pass a BGR np.ndarray
+        # Display and saving are disabled, and only one image is requested.
         results = self.model.predict(
             source=frame_bgr,
             conf=self.conf_thres,

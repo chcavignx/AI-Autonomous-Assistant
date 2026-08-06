@@ -97,8 +97,8 @@ def return_thread(futures, object_processor, face_processor, cfg) -> None:
             logger.error(f"Error in return_thread: {e}")
         finally:
             # Always release request back to the camera system to prevent stall
-            if request is not None: # pyright: ignore[reportPossiblyUnboundVariable]
-                request.release() # pyright: ignore[reportPossiblyUnboundVariable]
+            if request is not None:
+                request.release()
 
 
 def motion_detection_alert() -> None:
