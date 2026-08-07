@@ -117,7 +117,7 @@ vision:
       height: 640
     "imx500":
       width: 640
-      height: 640
+      height: 480
     "default":
       width: 1080
       height: 720
