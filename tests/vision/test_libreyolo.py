@@ -43,3 +43,14 @@ def test_yolo_cpu_detector_libreyolo_load() -> None:
         assert dets[0]["score"] == 0.95
         assert dets[0]["class_id"] == 0
         assert dets[0]["label"] == "person"
+
+
+def test_libre_yolo_onnx_predictor_missing_onnxruntime() -> None:
+    """Test that LibreYoloOnnxPredictor raises ImportError when onnxruntime is missing."""
+    from src.vision.yolo_cpu import LibreYoloOnnxPredictor
+
+    with (
+        patch.dict("sys.modules", {"onnxruntime": None}),
+        pytest.raises(ImportError, match="onnxruntime is required for LibreYoloOnnxPredictor"),
+    ):
+        LibreYoloOnnxPredictor("dummy.onnx")

@@ -12,7 +12,6 @@ from typing import Any, cast
 
 import cv2
 import numpy as np
-import onnxruntime as ort
 from ultralytics import YOLO
 from ultralytics.engine.results import Results
 
@@ -39,6 +38,14 @@ class LibreYoloOnnxPredictor:
 
         """
         self.model_path = model_path
+        try:
+            import onnxruntime as ort
+        except ImportError as err:
+            msg = (
+                "onnxruntime is required for LibreYoloOnnxPredictor when libreyolo package is not installed. "
+                "Please install onnxruntime (e.g. pip install onnxruntime)."
+            )
+            raise ImportError(msg) from err
         self.session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
         self.input_name = self.session.get_inputs()[0].name
         self.names = names or {i: f"class_{i}" for i in range(80)}
