@@ -97,3 +97,21 @@ def test_imx500_detector_get_labels_dash_filter() -> None:
     detector = Imx500Detector(Imx500Config(), imx500=mock_imx500)
     labels = detector.get_labels()
     assert labels == ["person", "car"]
+
+
+def test_dummy_boxes_len_and_iter() -> None:
+    """Test DummyBoxes __len__ and __iter__ functionality."""
+    from src.vision.yolo_imx500 import DummyBoxes, DummyResults
+
+    boxes = DummyBoxes()
+    assert len(boxes) == 0
+    assert list(boxes) == []
+
+    class MockDet:
+        x1, y1, x2, y2 = 10.0, 20.0, 30.0, 40.0
+        score = 0.9
+        cls = 0
+
+    res = DummyResults([MockDet()], (480, 640))
+    assert len(res.boxes) == 1
+    assert list(res.boxes) == [[10.0, 20.0, 30.0, 40.0]]

@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 import cv2
+import numpy as np
 
 # Ensure 'src' is in sys.path
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent.resolve()))
@@ -24,8 +25,6 @@ from src.vision.object_insight_frame import ObjectInsightFrame
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-    import numpy as np
-
     from src.utils.config import Config
 
 config.setup_python_path()
@@ -34,6 +33,16 @@ vcfg: Config = config.load_config()
 module_name = __name__
 lib_name = module_name.split(".")[1]
 logger = logging.getLogger(lib_name)
+
+
+def _is_valid_frame(frame: Any) -> bool:
+    """Check if frame is a non-empty array or a valid test object (e.g. MagicMock)."""
+    if frame is None:
+        return False
+    size = getattr(frame, "size", None)
+    if isinstance(size, (int, float, np.integer)):
+        return size > 0
+    return True
 
 
 class VideoCapture:
@@ -151,17 +160,19 @@ class VideoCapture:
         if self.camera is None:
             return None
         frame, metadata = self.camera.read()
-        if frame is not None:
+        if _is_valid_frame(frame):
             with self.lock:
                 self.latest_frame = frame
                 self.latest_metadata = metadata
             logger.debug("Frame captured")
-        else:
-            logger.error("Failed to capture frame")
-        return frame
+            return frame
+        logger.error("Failed to capture frame")
+        return None
 
     def process_frame(self, frame: np.ndarray) -> np.ndarray:
         """Process frame using active frame processors."""
+        if not _is_valid_frame(frame):
+            return frame
         annotated_frame = frame.copy()
 
         # 1. Run YOLO Object Detection if enabled
@@ -209,7 +220,7 @@ class VideoCapture:
 
     def _add_performance_overlay(self, frame: np.ndarray) -> None:
         """Add premium status and speed information using Ultralytics metrics."""
-        if self.latest_results is None:
+        if self.latest_results is None or not _is_valid_frame(frame):
             return
 
         # Speed metrics (ms)
@@ -231,7 +242,14 @@ class VideoCapture:
         color: tuple[int, int, int] = (255, 255, 255)
         cv2.putText(frame, f"FPS: {self.fps:.1f}", (10, 25), font, 0.6, color, 1)
         cv2.putText(frame, f"Inf: {inference:.1f}ms", (10, 50), font, 0.5, color, 1)
-        cv2.putText(frame, f"Objs: {len(self.latest_results.boxes)}", (10, 75), font, 0.5, color, 1)
+        boxes = getattr(self.latest_results, "boxes", None)
+        if hasattr(self.latest_results, "detections") and isinstance(self.latest_results.detections, (list, tuple)):
+            obj_count = len(self.latest_results.detections)
+        elif boxes is not None and hasattr(boxes, "__len__"):
+            obj_count = len(boxes)
+        else:
+            obj_count = 0
+        cv2.putText(frame, f"Objs: {obj_count}", (10, 75), font, 0.5, color, 1)
 
     def benchmark(self, iterations: int = 100) -> None:
         """Run a performance benchmark of the current model."""
@@ -264,7 +282,14 @@ class VideoCapture:
         results.save(filename=str(annotated_path))  # save to disk
         self.capture_count += 1
         logger.info("Saved annotated frame to %s", annotated_path)
-        return True, f"Captured result with {len(results.boxes)} object(s)"
+        boxes = getattr(results, "boxes", None)
+        if hasattr(results, "detections") and isinstance(results.detections, (list, tuple)):
+            obj_count = len(results.detections)
+        elif boxes is not None and hasattr(boxes, "__len__"):
+            obj_count = len(boxes)
+        else:
+            obj_count = 0
+        return True, f"Captured result with {obj_count} object(s)"
 
     def generate_frames(self) -> Generator[bytes, None, None]:
         """Generate frames for Flask video streaming.
