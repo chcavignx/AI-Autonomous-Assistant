@@ -305,9 +305,10 @@ def test_get_model_resolution() -> None:
     assert cfg.vision.get_model_resolution("LibreYOLOXn.onnx") == (416, 416)
     assert cfg.vision.get_model_resolution("LibreYOLOXn") == (416, 416)
 
-    # Test lookup for yolo26n / buffalo_l
+    # Test lookup for yolo26n / buffalo_l / imx500
     assert cfg.vision.get_model_resolution("yolo26n.onnx") == (640, 640)
     assert cfg.vision.get_model_resolution("buffalo_l") == (640, 640)
+    assert cfg.vision.get_model_resolution("imx500") == (640, 480)
 
     # Test default fallback for unknown model
     assert cfg.vision.get_model_resolution("unknown_model_xyz") == (1080, 720)

@@ -39,9 +39,13 @@ class DummyBoxes:
         self.conf = []
         self.cls = []
 
+    def __len__(self) -> int:
+        """Return number of bounding boxes."""
+        return len(self.xyxy)
+
     def __iter__(self) -> Any:
-        """Return empty iterator over bounding boxes."""
-        return iter([])
+        """Return iterator over bounding boxes."""
+        return iter(self.xyxy)
 
 
 class DummyResults:
