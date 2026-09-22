@@ -20,12 +20,13 @@ from src.utils.config import config
 DRY_RUN = os.getenv("DRY_RUN", "0") == "1"
 
 # Target directory
-CACHE_DIR = config.paths.models_vision_path / "yolo"
+CACHE_DIR = config.paths.models_vision_path / "yolo" / "cpu"
 if DRY_RUN:
     print(f"[DRY-RUN] Would create directory at {CACHE_DIR}")
 else:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
+LOAD_DATA_ENABLE = False
 DATASET_DIR = config.paths.dataset_vision_path
 # Ensure directories exist
 if DRY_RUN:
@@ -37,12 +38,13 @@ else:
 URLS = {
     "LibreYOLOXn.onnx": "https://huggingface.co/LibreYOLO/LibreYOLOXn/resolve/main/LibreYOLOXn.onnx",
     "LibreYOLOXn.pt": "https://huggingface.co/LibreYOLO/LibreYOLOXn/resolve/main/LibreYOLOXn.pt",
+}
+URLS_DATA = {
     "coco8.zip": "https://huggingface.co/datasets/LibreYOLO/coco8/resolve/main/coco8.zip",
     "coco128.zip": "https://huggingface.co/datasets/LibreYOLO/coco128/resolve/main/coco128.zip",
     "coco8.yaml": "https://raw.githubusercontent.com/ultralytics/ultralytics/main/ultralytics/cfg/datasets/coco8.yaml",
     "coco128.yaml": "https://raw.githubusercontent.com/ultralytics/ultralytics/main/ultralytics/cfg/datasets/coco128.yaml",
 }
-
 
 def download_file(url: str, dest_path: Path) -> None:
     """Download a file with progress reporting."""
@@ -86,23 +88,26 @@ def run() -> None:
             download_file(URLS[model_name], dest)
 
     # 2. Download and extract datasets
-    for zip_name in ["coco8.zip", "coco128.zip"]:
-        dest = DATASET_DIR / zip_name
-        extract_target = DATASET_DIR / zip_name.replace(".zip", "")
+    if LOAD_DATA_ENABLE:
+        for zip_name in ["coco8.zip", "coco128.zip"]:
+            dest = DATASET_DIR / zip_name
+            extract_target = DATASET_DIR / zip_name.replace(".zip", "")
 
-        # If directory already exists, skip
-        if not DRY_RUN and extract_target.exists():
-            print(f"Dataset directory {extract_target} already exists. Skipping.")
-        else:
-            download_file(URLS[zip_name], dest)
-            extract_zip(dest, DATASET_DIR)
+            # If directory already exists, skip
+            if not DRY_RUN and extract_target.exists():
+                print(f"Dataset directory {extract_target} already exists. Skipping.")
+            else:
+                download_file(URLS_DATA[zip_name], dest)
+                extract_zip(dest, DATASET_DIR)
+
     # 3. Download YAML files
-    for yml_name in ["coco8.yaml", "coco128.yaml"]:
-        dest = DATASET_DIR / yml_name
-        if not DRY_RUN and dest.exists():
-            print(f"{yml_name} already exists at {dest}. Skipping.")
-        else:
-            download_file(URLS[yml_name], dest)
+    if LOAD_DATA_ENABLE:
+        for yml_name in ["coco8.yaml", "coco128.yaml"]:
+            dest = DATASET_DIR / yml_name
+            if not DRY_RUN and dest.exists():
+                print(f"{yml_name} already exists at {dest}. Skipping.")
+            else:
+                download_file(URLS_DATA[yml_name], dest)
 
 if __name__ == "__main__":
     run()

@@ -3,31 +3,25 @@
 from __future__ import annotations
 
 import logging
-import pathlib
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import cv2
 import numpy as np
 
 from src.utils.config import config
-from src.vision.base import BaseDetector, DetectionDict
-from src.vision.yolo_cpu import Detection
+from src.vision.base import BaseDetector, Detection, DetectionDict
 
-module_name = __name__
-lib_name = module_name.split(".")[1]
-logger = logging.getLogger(lib_name)
-
-
-_imx500_w, _imx500_h = config.vision.get_model_resolution("imx500")
+logger = logging.getLogger(__name__.split(".")[1])
 
 
 @dataclass
 class Imx500Config:
     """Configuration for Sony IMX500 On-Sensor camera interface."""
 
-    frame_width: int = _imx500_w
-    frame_height: int = _imx500_h
+    frame_width: int = 640
+    frame_height: int = 480
 
 
 class DummyBoxes:
@@ -83,33 +77,49 @@ class Imx500Detector(BaseDetector):
         self.latest_frame = None
         self.imx500 = imx500
         self.picam2 = picam2
-        self.model = self.imx500
 
         try:
             from picamera2.devices import IMX500
             from picamera2.devices.imx500 import NetworkIntrinsics
 
             if self.imx500 is None:
-                self.imx500 = IMX500(str(config.vision.object_model_full_path))
-                self.model = self.imx500
-            self.intrinsics = self.imx500.network_intrinsics
-            if not self.intrinsics:
-                self.intrinsics = NetworkIntrinsics()
-                self.intrinsics.task = "object detection"
-            self.intrinsics.update_with_defaults()
+                raw_path = config.vision.object_model_full_path
+                model_path = (
+                    Path(raw_path)
+                    if raw_path
+                    else Path("/usr/share/imx500-models/imx500_network_ssd_mobilenetv2_fpnlite_320x320_pp.rpk")
+                )
+                if not model_path.exists() or model_path.suffix != ".rpk":
+                    candidates = [
+                        Path("/usr/share/imx500-models/imx500_network_ssd_mobilenetv2_fpnlite_320x320_pp.rpk"),
+                        Path("/usr/share/imx500-models/imx500_network_mobilenet_v2.rpk"),
+                        Path("/usr/share/rpi-camera-assets/imx500_network_ssd_mobilenetv2_fpnlite_320x320_pp.rpk"),
+                    ]
+                    for cand in candidates:
+                        if cand.exists():
+                            model_path = cand
+                            break
+
+                if model_path.exists() and model_path.suffix == ".rpk":
+                    self.imx500 = IMX500(str(model_path))
+            if self.imx500 is not None:
+                self.intrinsics = self.imx500.network_intrinsics
+                if not self.intrinsics:
+                    self.intrinsics = NetworkIntrinsics()
+                    self.intrinsics.task = "object detection"
+                self.intrinsics.update_with_defaults()
 
             if (
                 self.intrinsics.labels is None or len(self.intrinsics.labels) == 0
             ) and config.vision.object_label_full_path:
                 label_path = config.vision.object_label_full_path
                 if label_path.exists():
-                    self.intrinsics.labels = pathlib.Path(label_path).read_text(encoding="utf-8").splitlines()
+                    self.intrinsics.labels = Path(label_path).read_text(encoding="utf-8").splitlines()
             if self.imx500 is not None:
                 self.imx500.show_network_fw_progress_bar()
         except Exception as e:
             logger.warning("picamera2 / IMX500 hardware not initialized: %s", e)
             self.imx500 = None
-            self.model = None
             self.intrinsics = None
 
     def get_labels(self) -> list[str]:

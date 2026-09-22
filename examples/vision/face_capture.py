@@ -27,7 +27,7 @@ import time
 from datetime import datetime
 
 from src.utils.config import load_config
-from src.vision.face_in_frame import FaceInFrame
+from src.vision.face_insight_frame import FaceInsightFrame
 from src.utils.camera import discover_pi_cameras
 
 GEN_DATA_DIR = str(project_root / "data")
@@ -47,7 +47,7 @@ class FaceCaptureTool:
         self.current_camera = None
         self.current_person_name = "unknown"
         self.capture_count = 0
-        self.output_dir = self.cfg.vision.face_dataset_path or output_dir
+        self.output_dir = str(self.cfg.vision.face_dataset_full_path or output_dir)
         self.fps_counter = 0
         self.fps_start_time = time.time()
         self.current_fps = 0
@@ -56,13 +56,28 @@ class FaceCaptureTool:
 
         # Initialize configured modular face detector
         detector_type = getattr(self.cfg.vision, "face_detector_type", "cascade")
-        self.face_processor = FaceInFrame(self.cfg, detector_type=detector_type)
+        self.face_processor = FaceInsightFrame(self.cfg, detector_type=detector_type)
 
         # Initialize cameras
         self.initialize_cameras()
 
         # Create output directory
         os.makedirs(self.output_dir, exist_ok=True)
+
+    def stop(self) -> None:
+        """Stop cameras and release processor resources."""
+        if self.current_camera:
+            try:
+                self.current_camera["camera"].stop()
+                self.current_camera["camera"].close()
+            except Exception:
+                pass
+        if hasattr(self, "face_processor") and hasattr(self.face_processor, "stop"):
+            try:
+                self.face_processor.stop()
+            except Exception:
+                pass
+
 
     def initialize_cameras(self):
         """Initialize available cameras"""

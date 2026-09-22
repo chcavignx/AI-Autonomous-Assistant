@@ -24,14 +24,14 @@ import threading
 
 from src.utils.config import config
 from src.utils.camera import discover_pi_cameras
-from src.vision.face_in_frame import FaceInFrame
+from src.vision.face_insight_frame import FaceInsightFrame
 
 app_name = __name__.split(".")[-1]
 logger = logging.getLogger(app_name)
 
 app = Flask(__name__)
 
-output_dir = config.vision.face_dataset_path
+output_dir = str(config.vision.face_dataset_full_path or (project_root / "data" / "face_dataset"))
 os.makedirs(output_dir, exist_ok=True)
 
 class WebFaceCapture:
@@ -53,10 +53,26 @@ class WebFaceCapture:
 
         # Initialize configured modular face detector
         detector_type = getattr(self.cfg.vision, "face_detector_type", "cascade")
-        self.face_processor = FaceInFrame(self.cfg, detector_type=detector_type)
+        self.face_processor = FaceInsightFrame(self.cfg, detector_type=detector_type)
 
         os.makedirs(self.output_dir, exist_ok=True)
         self.initialize_cameras()
+
+    def stop(self) -> None:
+        """Stop camera and release processor resources."""
+        self.running = False
+        if self.current_camera and self.current_camera.get("camera"):
+            try:
+                self.current_camera["camera"].stop()
+                self.current_camera["camera"].close()
+            except Exception:
+                pass
+        if hasattr(self, "face_processor") and hasattr(self.face_processor, "stop"):
+            try:
+                self.face_processor.stop()
+            except Exception:
+                pass
+
 
     def initialize_cameras(self):
         """Initialize available cameras"""
@@ -278,7 +294,7 @@ class WebFaceCapture:
         if not os.path.exists(self.output_dir):
             return {"success": False, "message": "No registered face dataset found. Please capture/process some faces first."}
 
-        # Use the recognizer from the unified FaceInFrame processor
+        # Use the recognizer from the unified FaceInsightFrame processor
         try:
             recognizer = self.face_processor.face_recognizer
             if not recognizer:

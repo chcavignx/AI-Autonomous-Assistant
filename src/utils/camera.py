@@ -44,44 +44,83 @@ class ThreadedCamera:
         self.imx500 = None
         self.metadata = None
 
-        # Check if IMX500 vision is enabled
+        # 1. Check if IMX500 on-sensor AI vision is enabled
         if cfg.vision.object_model_type == "yolo_imx500" or cfg.vision.face_detector_type == "imx500":
-            try:
-                from picamera2 import Picamera2
-                from picamera2.devices import IMX500
-                from picamera2.devices.imx500 import NetworkIntrinsics
+            model_path_str = str(cfg.vision.object_model_full_path)
+            if model_path_str.endswith(".rpk"):
+                try:
+                    from picamera2 import Picamera2
+                    from picamera2.devices import IMX500
+                    from picamera2.devices.imx500 import NetworkIntrinsics
 
-                model_path = str(cfg.vision.object_model_full_path)
-                self.imx500 = IMX500(model_path)
+                    self.imx500 = IMX500(model_path_str)
 
-                intrinsics = self.imx500.network_intrinsics
-                if not intrinsics:
-                    intrinsics = NetworkIntrinsics()
-                    intrinsics.task = "object detection"
+                    intrinsics = self.imx500.network_intrinsics
+                    if not intrinsics:
+                        intrinsics = NetworkIntrinsics()
+                        intrinsics.task = "object detection"
 
-                intrinsics.update_with_defaults()
+                    intrinsics.update_with_defaults()
 
-                self.picam2 = Picamera2(self.imx500.camera_num)
-                picam2_config = self.picam2.create_preview_configuration(
-                    main={"size": (self.frame_width, self.frame_height), "format": cfg.vision.camera.format},
-                    controls={"FrameRate": intrinsics.inference_rate},
-                    buffer_count=6,
+                    self.picam2 = Picamera2(self.imx500.camera_num)
+                    picam2_config = self.picam2.create_preview_configuration(
+                        main={"size": (self.frame_width, self.frame_height), "format": cfg.vision.camera.format},
+                        controls={"FrameRate": intrinsics.inference_rate},
+                        buffer_count=12,
+                    )
+                    self.picam2.configure(picam2_config)
+                    self.picam2.start()
+                    self.use_picamera2 = True
+
+                    # Pre-allocate frames
+                    req = self.picam2.capture_request()
+                    self.grabbed = True
+                    self.frame = req.make_array("main")
+                    self.metadata = req.get_metadata()
+                    req.release()
+
+                except Exception as e:
+                    logger.exception("Failed to initialize Picamera2 IMX500 on-sensor AI: %s", e)
+                    self.use_picamera2 = False
+            else:
+                logger.warning(
+                    "IMX500 on-sensor AI requested, but '%s' is not an .rpk firmware file. Skipping on-sensor AI.",
+                    model_path_str,
                 )
-                self.picam2.configure(picam2_config)
-                self.picam2.start()
-                self.use_picamera2 = True
 
-                # Pre-allocate frames
-                req = self.picam2.capture_request()
-                self.grabbed = True
-                self.frame = req.make_array("main")
-                self.metadata = req.get_metadata()
-                req.release()
+        # 2. If not IMX500 on-sensor AI, try standard Picamera2 for Pi cameras (including IMX500 in standard mode)
+        if not self.use_picamera2:
+            try:
+                import importlib.util
 
+                if importlib.util.find_spec("picamera2") is not None:
+                    from picamera2 import Picamera2
+
+                    self.picam2 = Picamera2(self.camera_index)
+                    try:
+                        picam2_config = self.picam2.create_preview_configuration(
+                            main={"size": (self.frame_width, self.frame_height), "format": cfg.vision.camera.format},
+                            buffer_count=12,
+                        )
+                    except Exception:
+                        picam2_config = self.picam2.create_video_configuration(
+                            main={"size": (self.frame_width, self.frame_height), "format": cfg.vision.camera.format},
+                            buffer_count=4,
+                        )
+                    self.picam2.configure(picam2_config)
+                    self.picam2.start()
+                    self.use_picamera2 = True
+
+                    req = self.picam2.capture_request()
+                    self.grabbed = True
+                    self.frame = req.make_array("main")
+                    self.metadata = req.get_metadata()
+                    req.release()
             except Exception as e:
-                logger.exception("Failed to initialize Picamera2 IMX500: %s", e)
+                logger.debug("Standard Picamera2 initialization skipped or failed: %s", e)
                 self.use_picamera2 = False
 
+        # 3. Fall back to OpenCV VideoCapture (e.g. USB webcams or non-Pi environments)
         if not self.use_picamera2:
             self.cap = cv2.VideoCapture(self.camera_index)
             _ = self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
@@ -145,7 +184,10 @@ class ThreadedCamera:
         if self.thread:
             self.thread.join(timeout=1.0)
         if self.use_picamera2 and self.picam2:
-            self.picam2.stop()
+            with contextlib.suppress(Exception):
+                self.picam2.stop()
+            with contextlib.suppress(Exception):
+                self.picam2.close()
         elif hasattr(self, "cap") and self.cap.isOpened():
             self.cap.release()
 
@@ -205,6 +247,13 @@ class PiCamera:
         """Stop camera stream."""
         with contextlib.suppress(Exception):
             self._cam.stop()
+
+    def close(self) -> None:
+        """Close camera device and release resources."""
+        with contextlib.suppress(Exception):
+            self.stop()
+        with contextlib.suppress(Exception):
+            self._cam.close()
 
 
 def discover_pi_cameras() -> list[PiCamera]:

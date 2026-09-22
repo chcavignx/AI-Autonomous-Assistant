@@ -145,6 +145,8 @@ extend-exclude = [
     "src/audio/",
     ".agents/",
     ".source/",
+    "hailort/",
+    "gstshark_*/",
 ]
 
 [tool.ruff.lint]
@@ -160,7 +162,7 @@ ignore = [
     "FIX002",  # line contains TODO (I have TODOs and I'm not apologizing)
     "D100", "D101", "D102", "D103", "D104", "DOC201", "DOC402", "DOC501", # docstrings - I don't care about docstrings, Ruff. Relax.
     "FBT",     # Boolean positional args
-    "PLW0717", # Try clause contains too many statements
+    "TRY300", "TRY301", # Try clause structure
     "PLC0415", # Import should be at the top-level
     "BLE001",  # Do not catch blind exception
     "PLR",     # Pylint refactor (complexity, magic values, etc.)
@@ -172,7 +174,8 @@ ignore = [
     "RUF069",  # Unreliable floating point equality comparison
     "E501",    # Line too long (let formatting handle it)
     "ARG",     # Unused args
-    "RUF001", "RUF002"  # Ambiguous characters
+    "RUF001", "RUF002", # Ambiguous characters
+    "PLW0717"  # Try clause contains too many statements
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -221,6 +224,8 @@ filterwarnings = [
     "ignore:.*estimate.*:FutureWarning:skimage",
     "ignore::FutureWarning",
     "ignore::FutureWarning:skimage",
+    "ignore:.*metaschema specified by \\$schema.*:DeprecationWarning:jsonschema",
+    "ignore::DeprecationWarning:jsonschema",
     # Uncomment to selectively ignore specific third-party warnings if needed:
     # "ignore::DeprecationWarning:some_noisy_library",
     # "ignore::UserWarning:another_library",

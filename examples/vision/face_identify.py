@@ -44,11 +44,7 @@ class FaceIdentifyTool:
         self.current_camera = None
 
         # Load dataset path from config or fallback
-        # Note: self.cfg.vision.face_dataset_path might be relative or absolute. Handle gracefully.
-        if hasattr(self.cfg.vision, "face_dataset_path") and self.cfg.vision.face_dataset_path:
-            self.dataset_dir = self.cfg.vision.face_dataset_path
-        else:
-            self.dataset_dir = output_dir
+        self.dataset_dir = str(self.cfg.vision.face_dataset_full_path or output_dir)
 
         self.fps_counter = 0
         self.fps_start_time = time.time()
@@ -63,6 +59,21 @@ class FaceIdentifyTool:
 
         # Initialize available cameras
         self.initialize_cameras()
+
+    def stop(self) -> None:
+        """Stop camera and release recognizer resources."""
+        if self.current_camera:
+            try:
+                self.current_camera["camera"].stop()
+                self.current_camera["camera"].close()
+            except Exception:
+                pass
+        if hasattr(self, "recognizer") and hasattr(self.recognizer, "stop"):
+            try:
+                self.recognizer.stop()
+            except Exception:
+                pass
+
 
     def load_dataset(self):
         """Load known faces from dataset directory"""
@@ -183,16 +194,17 @@ class FaceIdentifyTool:
         cv2.rectangle(frame, (0, 0), (w, 100), (0, 0, 0), -1)
         cv2.rectangle(frame, (0, 0), (w, 100), (255, 0, 0), 2)
 
-        # Camera info
+        cam_name = self.current_camera["name"] if self.current_camera else "Unknown"
         cv2.putText(
             frame,
-            f"Camera: {self.current_camera['name']}", # pyright: ignore[reportOptionalSubscript]
+            f"Camera: {cam_name}",
             (10, 25),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.6,
             (255, 0, 0),
             2,
         )
+
 
         # FPS
         cv2.putText(

@@ -13,10 +13,10 @@ from src.vision.face_insight_pipeline import FaceInsightPipeline
 pytestmark = pytest.mark.basic
 
 
-@patch("src.vision.face_detector.pathlib.Path.exists")
+@patch("src.vision.face_detector.Path.exists")
 @patch("src.vision.face_detector.FaceAnalysis")
 @patch("src.vision.face_recognizer.get_model")
-def test_pipeline_insightface_detect(
+def test_face_insight_pipeline_insightface_detect(
     mock_get_model: MagicMock, mock_face_analysis: MagicMock, mock_exists: MagicMock
 ) -> None:
     """Test FaceInsightPipeline.detect() with InsightFace returns correct DetectionDict list."""
@@ -41,10 +41,10 @@ def test_pipeline_insightface_detect(
     assert dets[0]["label"] == "face"
 
 
-@patch("src.vision.face_detector.pathlib.Path.exists")
+@patch("src.vision.face_detector.Path.exists")
 @patch("src.vision.face_detector.FaceAnalysis")
 @patch("src.vision.face_recognizer.get_model")
-def test_pipeline_insightface_recognize(
+def test_face_insight_pipeline_insightface_recognize(
     mock_get_model: MagicMock, mock_face_analysis: MagicMock, mock_exists: MagicMock
 ) -> None:
     """Test recognize() returns unknown face when no known faces registered."""
@@ -70,10 +70,10 @@ def test_pipeline_insightface_recognize(
     assert results[0].similarity is None
 
 
-@patch("src.vision.face_detector.pathlib.Path.exists")
+@patch("src.vision.face_detector.Path.exists")
 @patch("src.vision.face_detector.FaceAnalysis")
 @patch("src.vision.face_recognizer.get_model")
-def test_pipeline_insightface_register_no_face(
+def test_face_insight_pipeline_insightface_register_no_face(
     mock_get_model: MagicMock, mock_face_analysis: MagicMock, mock_exists: MagicMock
 ) -> None:
     """Test register_face() raises when no face is detected."""
@@ -89,9 +89,11 @@ def test_pipeline_insightface_register_no_face(
         detector.register_face("user", np.zeros((100, 100, 3), dtype=np.uint8))
 
 
-@patch("src.vision.face_detector.Imx500Detector")
+@patch("src.vision.face_detector_imx.Imx500Detector")
 @patch("src.vision.face_recognizer.get_model")
-def test_pipeline_imx500_recognize_from_frame(mock_get_model: MagicMock, mock_detector_cls: MagicMock) -> None:
+def test_face_insight_pipeline_imx500_recognize_from_frame(
+    mock_get_model: MagicMock, mock_detector_cls: MagicMock
+) -> None:
     """Test recognize() with IMX500 detector uses metadata appropriately."""
     cfg = Config()
     cfg.vision.face_detector_type = "imx500"
@@ -104,13 +106,11 @@ def test_pipeline_imx500_recognize_from_frame(mock_get_model: MagicMock, mock_de
 
     # The get_model mock creates an ArcFace model
     mock_arcface = MagicMock()
-    # It must return a numpy array of shape (512,) to avoid ValueError broadcast mismatch with dot()
     mock_arcface.get.return_value = np.ones((512,), dtype=np.float32)
     mock_get_model.return_value = mock_arcface
 
     pipeline = FaceInsightPipeline(cfg, arcface_model_name="dummy.onnx")
 
-    # Dummy frame and metadata
     dummy_frame = np.zeros((480, 640, 3), dtype=np.uint8)
     dummy_metadata = {"format": "RGB888"}
 
@@ -119,3 +119,41 @@ def test_pipeline_imx500_recognize_from_frame(mock_get_model: MagicMock, mock_de
     assert len(results) == 1
     assert results[0].identity is None
     assert mock_detector.detect_faces_metadata.called
+
+
+@patch("cv2.CascadeClassifier")
+@patch("src.vision.face_recognizer.get_model")
+def test_face_insight_pipeline_cascade_backend(mock_get_model: MagicMock, mock_cascade: MagicMock) -> None:
+    """Test initializing FaceInsightPipeline with cascade backend."""
+    mock_cascade.return_value = MagicMock(empty=lambda: False, detectMultiScale=lambda *a, **k: [(10, 10, 40, 40)])
+    mock_get_model.return_value = MagicMock()
+
+    cfg = Config()
+    cfg.vision.face_detector_type = "cascade"
+    pipeline = FaceInsightPipeline(cfg)
+
+    frame = np.zeros((100, 100, 3), dtype=np.uint8)
+    dets = pipeline.detect(frame)
+    assert len(dets) == 1
+    assert dets[0]["box"] == [10, 10, 50, 50]
+
+
+@patch("src.vision.face_recognizer.get_model")
+def test_face_insight_pipeline_known_faces_property(mock_get_model: MagicMock) -> None:
+    """Test known_faces property get and set on FaceInsightPipeline."""
+    mock_get_model.return_value = MagicMock()
+    cfg = Config()
+    pipeline = FaceInsightPipeline(cfg)
+
+    assert isinstance(pipeline.known_faces, dict)
+    pipeline.known_faces = {"alice": np.ones(512)}
+    assert "alice" in pipeline.known_faces
+
+
+@patch("src.vision.face_recognizer.get_model")
+def test_face_insight_pipeline_stop(mock_get_model: MagicMock) -> None:
+    """Test stop() method succeeds."""
+    mock_get_model.return_value = MagicMock()
+    cfg = Config()
+    pipeline = FaceInsightPipeline(cfg)
+    pipeline.stop()

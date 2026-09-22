@@ -1,37 +1,28 @@
-"""Face detection modules (CPU/RetinaFace and IMX500)."""
+"""Face detection modules (CPU: RetinaFace and Haar Cascade)."""
 
 from __future__ import annotations
 
+import contextlib
 import logging
-import pathlib
-from dataclasses import dataclass
 from pathlib import Path
 
+import cv2
 import numpy as np
-from insightface.app import FaceAnalysis
 
-from src.utils.config import Config, config, load_config
-from src.vision.base import BaseDetector, DetectionDict
+from src.utils.config import Config, load_config
+from src.vision.base import BaseDetector, DetectedFace, DetectionDict
 
-module_name = __name__
-lib_name = module_name.split(".")[1]
-logger = logging.getLogger(lib_name)
+try:
+    from insightface.app import FaceAnalysis
+except ImportError:
+    FaceAnalysis = None  # type: ignore[assignment, misc]
 
+logger = logging.getLogger(__name__.split(".")[1])
 
-@dataclass
-class FaceEmbedding:
-    id: str
-    embedding: np.ndarray
+with contextlib.suppress(ImportError):
+    pass
 
-
-@dataclass
-class DetectedFace:
-    bbox: tuple[float, float, float, float]  # x1,y1,x2,y2 in pixels
-    landmark5: np.ndarray | None  # (5,2) or None
-    score: float
-    identity: str | None = None
-    similarity: float | None = None
-    embedding: np.ndarray | None = None  # Extracted embedding if available
+CASCADE_FALLBACK_PATH = "haarcascade_frontalface_default.xml"
 
 
 class InsightFaceDetector(BaseDetector):
@@ -40,22 +31,38 @@ class InsightFaceDetector(BaseDetector):
     def __init__(self, cfg: Config | None = None, det_size: tuple[int, int] = (640, 640)) -> None:
         """Initialize the InsightFace CPU detector."""
         self.cfg = cfg or load_config()
-        model_path = self.cfg.vision.face_detector_model_path
+        model_name = self.cfg.vision.face_model_name or "buffalo_l"
+        if model_name.endswith((".rpk", ".xml", ".hef")):
+            model_name = "buffalo_l"
 
-        if not pathlib.Path(model_path).exists():
-            logger.error("Face detector model not found at %s", model_path)
-            msg = f"Face detector model not found at {model_path}"
+        root_dir = self.cfg.paths.models_vision_path / "insightface"
+        if not (root_dir / model_name).exists():
+            alt_dir = self.cfg.paths.models_vision_path / self.cfg.vision.face_detector_type
+            if (alt_dir / model_name).exists():
+                root_dir = alt_dir
+            elif (self.cfg.paths.models_vision_path / "insightface" / "buffalo_l").exists():
+                root_dir = self.cfg.paths.models_vision_path / "insightface"
+                model_name = "buffalo_l"
+
+        if not (root_dir / model_name).exists():
+            msg = f"InsightFace model '{model_name}' not found in {root_dir}"
             logger.error(msg)
             raise FileNotFoundError(msg)
 
+        if FaceAnalysis is None:
+            msg = "insightface is required for InsightFaceDetector. Please install insightface."
+            logger.error(msg)
+            raise ImportError(msg)
+
         self.app = FaceAnalysis(
-            name=model_path,
-            root=model_path.parent,
+            name=model_name,
+            root=str(root_dir),
             providers=["CPUExecutionProvider"],
         )
         self.app.prepare(ctx_id=0, det_size=det_size)
 
     def detect_faces_raw(self, frame: np.ndarray) -> list[DetectedFace]:
+        """Detect faces in BGR frame returning raw DetectedFace instances."""
         faces = self.app.get(frame)
         results: list[DetectedFace] = []
         for f in faces:
@@ -86,7 +93,8 @@ class InsightFaceDetector(BaseDetector):
             )
         return results
 
-    def detect(self, frame: np.ndarray) -> list[DetectionDict]:
+    def detect(self, frame: np.ndarray, metadata: dict | None = None) -> list[DetectionDict]:
+        """Detect faces in BGR frame returning standardized DetectionDict list."""
         faces = self.detect_faces_raw(frame)
         detections: list[DetectionDict] = []
         for f in faces:
@@ -102,95 +110,102 @@ class InsightFaceDetector(BaseDetector):
         return detections
 
 
-_imx500_w, _imx500_h = config.vision.get_model_resolution("imx500")
+class CascadeFaceDetector(BaseDetector):
+    """Face detector using OpenCV's Haar Cascade classifier."""
 
+    @staticmethod
+    def _resolve_default_cascade_path() -> str:
+        """Resolve system default OpenCV Haar Cascade path."""
+        haarcascades = getattr(getattr(cv2, "data", None), "haarcascades", None)
+        if haarcascades:
+            default_path = Path(haarcascades) / "haarcascade_frontalface_default.xml"
+            if default_path.exists():
+                return str(default_path)
+        return CASCADE_FALLBACK_PATH
 
-@dataclass
-class Imx500Config:
-    """Configuration for the IMX500 pipeline for on-sensor detection."""
+    def __init__(self, cfg: Config | None = None, cascade_path: str | Path | None = None) -> None:
+        """Initialize the Haar Cascade Face Detector.
 
-    frame_width: int = _imx500_w
-    frame_height: int = _imx500_h
+        Args:
+            cfg: Optional Config instance.
+            cascade_path: Optional path to Haar Cascade XML file.
 
-
-class Imx500Detector(BaseDetector):
-    """IMX500 Face detector wrapper using native Picamera2 API."""
-
-    def __init__(self, cfg: Config | None = None, imx500: Path | None = None) -> None:
-        """Initialize the IMX500 detector."""
+        """
         self.cfg = cfg or load_config()
-        model_path = imx500 or self.cfg.vision.face_detector_model_path
+        raw_path = cascade_path if cascade_path is not None else self.cfg.vision.face_detector_model_path
+        candidate_path = Path(raw_path) if raw_path else None
 
-        if not pathlib.Path(model_path).exists():
-            model_path = "/usr/share/imx500-models/imx500_network_mobilenet_v2.rpk"
-        self.imx500 = None
+        default_cascade = self._resolve_default_cascade_path()
+
+        if candidate_path is not None:
+            if candidate_path.suffix.lower() != ".xml":
+                logger.warning(
+                    "CascadeFaceDetector requires an XML model file, but received '%s'. Using cv2 default: %s",
+                    candidate_path,
+                    default_cascade,
+                )
+                self.cascade_path = default_cascade
+            elif not candidate_path.exists():
+                logger.warning(
+                    "Cascade file not found at %s. Using cv2 default: %s",
+                    candidate_path,
+                    default_cascade,
+                )
+                self.cascade_path = default_cascade
+            else:
+                self.cascade_path = str(candidate_path)
+        else:
+            self.cascade_path = default_cascade
 
         try:
-            from picamera2.devices import IMX500
-            from picamera2.devices.imx500 import NetworkIntrinsics
+            self.face_cascade = cv2.CascadeClassifier(self.cascade_path)
+        except Exception as e:
+            logger.warning("Failed to initialize CascadeClassifier from %s: %s", self.cascade_path, e)
+            self.face_cascade = cv2.CascadeClassifier()
 
-            if self.imx500 is None:
-                self.imx500 = IMX500(model_path)
-            self.intrinsics = self.imx500.network_intrinsics
-            if not self.intrinsics:
-                self.intrinsics = NetworkIntrinsics()
-                self.intrinsics.task = "object detection"
-            self.intrinsics.update_with_defaults()
-        except ImportError:
-            logger.exception("picamera2 is required for IMX500 detector")
-            self.imx500 = None
+        if self.face_cascade.empty():
+            logger.error("Failed to load cascade classifier from %s", self.cascade_path)
+
+    def detect(self, frame: np.ndarray, metadata: dict | None = None) -> list[DetectionDict]:
+        """Detect faces in BGR frame.
+
+        Args:
+            frame: Input BGR image.
+            metadata: Optional metadata (ignored in cascade detector).
+
+        Returns:
+            List of standardized DetectionDict.
+
+        """
+        if self.face_cascade.empty():
+            return []
+
+        # Convert to grayscale for detection
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # Detect faces
+        faces = self.face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+
+        detections: list[DetectionDict] = []
+        for x, y, w, h in faces:
+            detections.append(
+                {
+                    "box": [int(x), int(y), int(x + w), int(y + h)],
+                    "score": 1.0,
+                    "class_id": 0,
+                    "label": "face",
+                }
+            )
+
+        return detections
 
     def detect_faces_raw(self, frame: np.ndarray) -> list[DetectedFace]:
-        """Infer without metadata is not supported directly."""
-        return []
-
-    def detect_faces_metadata(self, frame: np.ndarray, metadata: dict | None = None) -> list[DetectedFace]:
-        """Fetch latest bounding boxes from metadata."""
-        if not metadata or not self.imx500:
-            return []
-
-        np_outputs = self.imx500.get_outputs(metadata, add_batch=True)
-        if np_outputs is None:
-            return []
-
-        threshold = self.cfg.vision.face_recognition_threshold
-        input_w, input_h = self.imx500.get_input_size()
-
-        boxes, scores, classes = np_outputs[0][0], np_outputs[1][0], np_outputs[2][0]
-        if self.intrinsics.bbox_normalization:
-            boxes /= input_h
-        if self.intrinsics.bbox_order == "xy":
-            boxes = boxes[:, [1, 0, 3, 2]]
-
-        faces = []
-        frame_h, frame_w = frame.shape[:2]
-
-        for box, score, _category in zip(boxes, scores, classes, strict=False):
-            if score > threshold:
-                x0, y0, x1, y1 = box[0], box[1], box[2], box[3]
-                if self.intrinsics.bbox_order == "yx":
-                    y0, x0, y1, x1 = box[0], box[1], box[2], box[3]
-
-                if not self.intrinsics.bbox_normalization and self.intrinsics.postprocess != "nanodet":
-                    x0 /= input_w
-                    y0 /= input_h
-                    x1 /= input_w
-                    y1 /= input_h
-
-                # NOTE: IMX500 face models might not provide 5-point landmarks or might provide them in other outputs.
-                # Assuming simple bounding boxes for IMX500 face detection as per original rpi-ai-camera implementation
-                faces.append(
-                    DetectedFace(
-                        bbox=(x0 * frame_w, y0 * frame_h, x1 * frame_w, y1 * frame_h),
-                        landmark5=None,
-                        score=float(score),
-                    )
-                )
-
-        return faces
-
-    def detect(self, frame: np.ndarray) -> list[DetectionDict]:
-        return []
-
-    def stop(self) -> None:
-        pass
+        """Detect faces in BGR frame returning DetectedFace list."""
+        detections = self.detect(frame)
+        return [
+            DetectedFace(
+                bbox=(float(d["box"][0]), float(d["box"][1]), float(d["box"][2]), float(d["box"][3])),
+                landmark5=None,
+                score=float(d.get("score", 1.0)),
+            )
+            for d in detections
+        ]

@@ -16,11 +16,11 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from src.utils.config import load_config
-from src.vision.face_insight_frame import FaceInsightFrame # pyright: ignore[reportMissingImports]
+from src.vision.face_insight_frame import FaceInsightFrame
 from src.vision.object_insight_frame import ObjectInsightFrame
 
 import picamera2
-from picamera2 import MappedArray, Process, RemoteMappedArray # pyright: ignore[reportUnusedImport]
+from picamera2 import MappedArray, Process, RemoteMappedArray  # pyright: ignore[reportUnusedImport]
 
 app_name = __name__.split(".")[-1]
 logger = logging.getLogger(app_name)
@@ -83,7 +83,7 @@ def return_thread(futures, object_processor, face_processor, cfg) -> None:
                     frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
 
                     # 1. Run Object Recognition
-                    _, objects = object_processor.process_frame(frame_bgr, draw=False)
+                    _, objects, _ = object_processor.process_frame(frame_bgr, draw=False)
                     for obj in objects:
                         logger.info(f"  [Object] {obj['label']} (Score: {obj['score']:.2f})")
 

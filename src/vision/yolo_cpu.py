@@ -3,31 +3,31 @@
 from __future__ import annotations
 
 import logging
-import pathlib
-import sys
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
 import cv2
 import numpy as np
-from ultralytics import YOLO
-from ultralytics.engine.results import Results
-
-# Ensure 'src' is in sys.path
-sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.resolve()))
 
 from src.utils.config import Config, load_config
-from src.vision.base import BaseDetector, DetectionDict
+from src.vision.base import BaseDetector, Detection, DetectionDict
 
-module_name = __name__
-lib_name = module_name.split(".")[1]
-logger = logging.getLogger(lib_name)
+try:
+    from ultralytics import YOLO
+    from ultralytics.engine.results import Results
+
+    has_ultralytics = True
+except ImportError:
+    YOLO = None  # pyright: ignore[reportConstantRedefinition]
+    Results = Any
+    has_ultralytics = False
+
+logger = logging.getLogger(__name__.split(".")[1])
 
 
 class LibreYoloOnnxPredictor:
-    """ONNX Runtime fallback for LibreYOLO / YOLOX models when libreyolo package is not installed."""
+    """ONNX Runtime fallback for LibreYOLO."""
 
     def __init__(self, model_path: str, names: dict[int, str] | None = None) -> None:
         """Initialize the YOLOX ONNX Runtime predictor.
@@ -47,7 +47,11 @@ class LibreYoloOnnxPredictor:
             )
             raise ImportError(msg) from err
         self.session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
-        self.input_name = self.session.get_inputs()[0].name
+        inputs = self.session.get_inputs()
+        self.input_name = inputs[0].name
+        shape = inputs[0].shape
+        self.input_h = shape[2] if len(shape) >= 4 and isinstance(shape[2], int) and shape[2] > 0 else None
+        self.input_w = shape[3] if len(shape) >= 4 and isinstance(shape[3], int) and shape[3] > 0 else None
         self.names = names or {i: f"class_{i}" for i in range(80)}
 
     def predict(
@@ -58,15 +62,18 @@ class LibreYoloOnnxPredictor:
         imgsz: tuple[int, int] | int = (416, 416),
         rect: bool = False,
         device: str = "cpu",
-    ) -> list[Results]:
+    ) -> list[Any]:
         """Run YOLOX ONNX inference on a BGR frame and return Ultralytics Results."""
         h_orig, w_orig = source.shape[:2]
-        if isinstance(imgsz, (list, tuple)):
+        if self.input_h is not None and self.input_w is not None:
+            h_in, w_in = self.input_h, self.input_w
+        elif isinstance(imgsz, (list, tuple)):
             h_in, w_in = imgsz
         else:
             h_in = w_in = imgsz
 
         # Letterbox resize
+
         r = min(h_in / h_orig, w_in / w_orig)
         rw, rh = round(w_orig * r), round(h_orig * r)
         dw, dh = (w_in - rw) / 2, (h_in - rh) / 2
@@ -115,13 +122,42 @@ class LibreYoloOnnxPredictor:
 
         class_ids = np.argmax(scores, axis=1)
         max_scores = np.max(scores, axis=1)
-
         mask = max_scores >= conf
+
+        def _create_result(orig_img: np.ndarray, path: str, names: dict, boxes: np.ndarray, speed_dict: dict) -> Any:
+            if has_ultralytics:
+                r = Results(orig_img=orig_img, path=path, names=names, boxes=boxes)
+                r.speed = speed_dict
+                r.save = lambda filename=None, **kwargs: cv2.imwrite(filename, r.plot()) if filename else None
+                return r
+
+            class _SimpleResults:
+                def __init__(self, img: np.ndarray, p: str, n: dict, b: np.ndarray, sp: dict) -> None:
+                    self.orig_img = img
+                    self.path = p
+                    self.names = n
+                    self.boxes = b
+                    self.speed = sp
+
+                def plot(self) -> np.ndarray:
+                    return self.orig_img
+
+                def save(self, filename: str | None = None, **kwargs: Any) -> None:
+                    if filename:
+                        cv2.imwrite(filename, self.plot())
+
+            return _SimpleResults(orig_img, path, names, boxes, speed_dict)
+
         if not np.any(mask):
-            res = Results(orig_img=source, path=self.model_path, names=self.names, boxes=np.zeros((0, 6)))
-            res.speed = {"preprocess": (t1 - t0) * 1000, "inference": (t2 - t1) * 1000, "postprocess": 0.0}
-            res.save = lambda filename=None, **kwargs: cv2.imwrite(filename, res.plot()) if filename else None
-            return [res]
+            return [
+                _create_result(
+                    source,
+                    self.model_path,
+                    self.names,
+                    np.zeros((0, 6)),
+                    {"preprocess": (t1 - t0) * 1000, "inference": (t2 - t1) * 1000, "postprocess": 0.0},
+                )
+            ]
 
         b_cxcy = cxcy[mask]
         b_wh = wh[mask]
@@ -144,9 +180,13 @@ class LibreYoloOnnxPredictor:
             box_data = np.zeros((0, 6))
 
         t3 = time.time()
-        res = Results(orig_img=source, path=self.model_path, names=self.names, boxes=box_data)
-        res.speed = {"preprocess": (t1 - t0) * 1000, "inference": (t2 - t1) * 1000, "postprocess": (t3 - t2) * 1000}
-        res.save = lambda filename=None, **kwargs: cv2.imwrite(filename, res.plot()) if filename else None
+        res = _create_result(
+            source,
+            self.model_path,
+            self.names,
+            box_data,
+            {"preprocess": (t1 - t0) * 1000, "inference": (t2 - t1) * 1000, "postprocess": (t3 - t2) * 1000},
+        )
         return [res]
 
 
@@ -192,9 +232,65 @@ class YoloCpuDetector(BaseDetector):
             except ImportError:
                 logger.info("libreyolo package not installed, using ONNX Runtime YOLOX predictor")
                 return LibreYoloOnnxPredictor(self.model_path)
+
+        if self.model_path.endswith((".hef", ".rpk")):
+            # HEF/RPK are hardware binaries that cannot be executed directly on CPU via Ultralytics
+            for fallback_name in ["yolo26n.onnx", "yolo11n.onnx", "LibreYOLOXn.onnx"]:
+                candidate = Path(
+                    self.cfg.paths.models_vision_path,
+                    self.cfg.vision.object_model_type,
+                    self.cfg.vision.object_device,
+                    fallback_name,
+                )
+                if candidate.exists():
+                    logger.info("Falling back from hardware model %s to CPU model %s", self.model_path, candidate)
+                    if (
+                        YOLO is not None
+                        and candidate.suffix in {".pt", ".onnx"}
+                        and not candidate.name.lower().startswith("libreyolo")
+                    ):
+                        return YOLO(str(candidate))
+                    if candidate.suffix == ".onnx":
+                        return LibreYoloOnnxPredictor(str(candidate))
+
+        if YOLO is None or self.model_path.endswith((".hef", ".rpk")):
+            if self.model_path.endswith(".onnx"):
+                logger.info("ultralytics package not installed, using ONNX Runtime predictor for %s", self.model_path)
+                return LibreYoloOnnxPredictor(self.model_path)
+            logger.warning("ultralytics cannot execute %s on CPU; using dummy fallback model", self.model_path)
+
+            class _DummyYolo:
+                def __init__(self, path: str) -> None:
+                    self.path = path
+                    self.names = {0: "object"}
+
+                def predict(self, *args: Any, **kwargs: Any) -> list[Any]:
+                    source = kwargs.get("source")
+                    if source is None and args:
+                        source = args[0]
+                    if source is None:
+                        source = np.zeros((100, 100, 3), dtype=np.uint8)
+
+                    class _DummyRes:
+                        def __init__(self, img: np.ndarray) -> None:
+                            self.orig_img = img
+                            self.boxes: list[Any] = []
+                            self.speed = {"preprocess": 1.0, "inference": 1.0, "postprocess": 1.0}
+
+                        def plot(self) -> np.ndarray:
+                            return self.orig_img
+
+                        def save(self, filename: str | None = None, **kw: Any) -> None:
+                            if filename:
+                                cv2.imwrite(filename, self.plot())
+
+                    return [_DummyRes(source)]
+
+            return _DummyYolo(self.model_path)
+
         return YOLO(self.model_path)
 
-    def infer(self, frame_bgr: np.ndarray, metadata: dict | None = None) -> Results:
+    def infer(self, frame_bgr: np.ndarray, metadata: dict | None = None) -> Any:
         """Run inference on a single frame.
 
         Args:
@@ -324,7 +420,7 @@ class YoloCpuDetector(BaseDetector):
         return {"avg_ms": avg_time_ms, "fps": fps}
 
     @staticmethod
-    def draw_detections(results: Results) -> np.ndarray:
+    def draw_detections(results: Any) -> np.ndarray:
         """Draw detections on the frame using Ultralytics plot().
 
         Args:
@@ -337,16 +433,6 @@ class YoloCpuDetector(BaseDetector):
         return results.plot()
 
 
-@dataclass
-class Detection:
-    x1: float
-    y1: float
-    x2: float
-    y2: float
-    score: float
-    cls: int
-
-
 class Yolo26NcnnDetector(BaseDetector):
     """YOLO detector in NCNN format via Ultralytics.
 
@@ -357,11 +443,22 @@ class Yolo26NcnnDetector(BaseDetector):
 
     def __init__(self, cfg: Config | None = None, conf_thres: float | None = None) -> None:
         """Initialize the YOLO NCNN detector."""
-        if cfg is None:
-            cfg = load_config()
-        self.model_path = str(cfg.vision.object_model_full_path)
+        self.cfg = cfg or load_config()
+        self.model_path = str(self.cfg.vision.object_model_full_path)
+        if not Path(self.model_path).exists() or not self.model_path.endswith("_ncnn_model"):
+            candidate = Path(
+                self.cfg.paths.models_vision_path,
+                self.cfg.vision.object_model_type,
+                self.cfg.vision.object_device,
+                "yolo26n_ncnn_model",
+            )
+            if candidate.exists():
+                self.model_path = str(candidate)
+        if YOLO is None:
+            msg = "ultralytics package is required for Yolo26NcnnDetector. Please install ultralytics."
+            raise ImportError(msg)
         self.model = YOLO(self.model_path)
-        self.conf_thres = conf_thres if conf_thres is not None else cfg.vision.object_recognition_threshold
+        self.conf_thres = conf_thres if conf_thres is not None else self.cfg.vision.object_recognition_threshold
 
     def infer(self, frame_bgr: np.ndarray, metadata: dict | None = None) -> list[Detection]:
         """Run raw inference on a single frame.
@@ -374,13 +471,13 @@ class Yolo26NcnnDetector(BaseDetector):
             List of Detection objects.
 
         """
-        # Use Ultralytics low-level API to pass a BGR np.ndarray
-        # Display and saving are disabled, and only one image is requested.
+        base_size = max(frame_bgr.shape[0], frame_bgr.shape[1])
+        stride_imgsz = ((base_size + 31) // 32) * 32
         results = self.model.predict(
             source=frame_bgr,
             conf=self.conf_thres,
             verbose=False,
-            imgsz=max(frame_bgr.shape[0], frame_bgr.shape[1]),
+            imgsz=stride_imgsz,
             max_det=300,
         )
 

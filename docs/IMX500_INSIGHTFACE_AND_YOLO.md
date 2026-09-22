@@ -151,13 +151,18 @@ def choose_device() -> str:
 
 
 def sanity_check():
-    print(json.dumps({
-        "python": sys.version.split()[0],
-        "platform": platform.platform(),
-        "torch": torch.__version__,
-        "mps_available": torch.backends.mps.is_available(),
-        "mps_built": torch.backends.mps.is_built(),
-    }, indent=2))
+    print(
+        json.dumps(
+            {
+                "python": sys.version.split()[0],
+                "platform": platform.platform(),
+                "torch": torch.__version__,
+                "mps_available": torch.backends.mps.is_available(),
+                "mps_built": torch.backends.mps.is_built(),
+            },
+            indent=2,
+        )
+    )
 
     if not Path(DATA_YAML).exists():
         raise FileNotFoundError(f"Dataset YAML not found: {DATA_YAML}")
@@ -280,52 +285,54 @@ import random
 import shutil
 from pathlib import Path
 
-IMAGE_EXTS = {'.jpg', '.jpeg', '.png', '.bmp', '.webp'}
+IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
 
 def collect_image_label_pairs(images_dir: Path, labels_dir: Path):
     pairs = []
-    for img in images_dir.rglob('*'):
+    for img in images_dir.rglob("*"):
         if not img.is_file() or img.suffix.lower() not in IMAGE_EXTS:
             continue
         rel = img.relative_to(images_dir)
-        label = (labels_dir / rel).with_suffix('.txt')
+        label = (labels_dir / rel).with_suffix(".txt")
         if label.exists():
             pairs.append((img, label, rel))
     return pairs
 
 
 def remove_cache_files(root: Path):
-    for cache_file in root.rglob('*.cache'):
+    for cache_file in root.rglob("*.cache"):
         cache_file.unlink(missing_ok=True)
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Create a smaller YOLO validation subset for IMX500 export, copying matching images and labels.'
+        description="Create a smaller YOLO validation subset for IMX500 export, copying matching images and labels."
     )
-    parser.add_argument('source_root', help='Source dataset root containing val/images and val/labels')
-    parser.add_argument('output_root', help='Output dataset root where val/images and val/labels will be created')
-    parser.add_argument('--count', type=int, default=300, help='Number of image/label pairs to copy (default: 300)')
-    parser.add_argument('--seed', type=int, default=42, help='Random seed (default: 42)')
-    parser.add_argument('--flat', action='store_true', help='Copy selected files into flat val/images and val/labels folders')
+    parser.add_argument("source_root", help="Source dataset root containing val/images and val/labels")
+    parser.add_argument("output_root", help="Output dataset root where val/images and val/labels will be created")
+    parser.add_argument("--count", type=int, default=300, help="Number of image/label pairs to copy (default: 300)")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed (default: 42)")
+    parser.add_argument(
+        "--flat", action="store_true", help="Copy selected files into flat val/images and val/labels folders"
+    )
     args = parser.parse_args()
 
     src_root = Path(args.source_root)
     dst_root = Path(args.output_root)
-    src_images = src_root / 'val' / 'images'
-    src_labels = src_root / 'val' / 'labels'
-    dst_images = dst_root / 'val' / 'images'
-    dst_labels = dst_root / 'val' / 'labels'
+    src_images = src_root / "val" / "images"
+    src_labels = src_root / "val" / "labels"
+    dst_images = dst_root / "val" / "images"
+    dst_labels = dst_root / "val" / "labels"
 
     if not src_images.is_dir():
-        raise SystemExit(f'Missing source images directory: {src_images}')
+        raise SystemExit(f"Missing source images directory: {src_images}")
     if not src_labels.is_dir():
-        raise SystemExit(f'Missing source labels directory: {src_labels}')
+        raise SystemExit(f"Missing source labels directory: {src_labels}")
 
     pairs = collect_image_label_pairs(src_images, src_labels)
     if not pairs:
-        raise SystemExit('No matching image/label pairs found in val/images and val/labels')
+        raise SystemExit("No matching image/label pairs found in val/images and val/labels")
 
     rng = random.Random(args.seed)
     sample_size = min(args.count, len(pairs))
@@ -337,30 +344,30 @@ def main():
     for img, label, rel in selected:
         if args.flat:
             img_target = dst_images / img.name
-            label_target = dst_labels / (img.stem + '.txt')
+            label_target = dst_labels / (img.stem + ".txt")
             i = 1
             while img_target.exists() or label_target.exists():
-                img_target = dst_images / f'{img.stem}_{i}{img.suffix}'
-                label_target = dst_labels / f'{img.stem}_{i}.txt'
+                img_target = dst_images / f"{img.stem}_{i}{img.suffix}"
+                label_target = dst_labels / f"{img.stem}_{i}.txt"
                 i += 1
         else:
             img_target = dst_images / rel
-            label_target = (dst_labels / rel).with_suffix('.txt')
+            label_target = (dst_labels / rel).with_suffix(".txt")
             img_target.parent.mkdir(parents=True, exist_ok=True)
             label_target.parent.mkdir(parents=True, exist_ok=True)
 
         shutil.copy2(img, img_target)
         shutil.copy2(label, label_target)
 
-    remove_cache_files(dst_root / 'val')
+    remove_cache_files(dst_root / "val")
 
-    print(f'Selected {sample_size} matching image/label pairs from {len(pairs)} available pairs.')
-    print(f'Validation subset written to: {dst_root.resolve()}')
-    print('Copied: val/images and val/labels')
-    print('Note: labels.cache is not copied; Ultralytics should regenerate it for the new subset.')
+    print(f"Selected {sample_size} matching image/label pairs from {len(pairs)} available pairs.")
+    print(f"Validation subset written to: {dst_root.resolve()}")
+    print("Copied: val/images and val/labels")
+    print("Note: labels.cache is not copied; Ultralytics should regenerate it for the new subset.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
 ```
 

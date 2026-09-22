@@ -7,20 +7,35 @@ paths:
   cache: ".cache"
   models: "models"
 
-# Text-to-Speech configuration
-tts:
-  engine: "piper"
-  model_name: "jarvis-medium.onnx"
-  model_path: Null # Let Python code build the path dynamically
-  cli_mode: false
-  device: "cpu"
-  length_scale: 1.0
-  noise_scale: 1.0
-  noise_w_scale: 1.0
-  normalize_audio: true
-  speed: 1.0
-  volume: 0.5
+# Platform-specific configuration
+platform:
+  cpu_cores: 2  # Limit CPU cores for multiprocessing on Pi5
+  pi: true  # Automatically detect Raspberry Pi and apply tuning
 
+# Vision profile selection (modular configuration)
+# Available profiles in config/vision/:
+#   - "config/vision/config_vision_hailo.yaml"      (Hailo-8/8L NPU: YOLOv8s + SCRFD 2.5G + ArcFace)
+#   - "config/vision/config_vision_cpu.yaml"        (Pi5 CPU: YOLO ONNX + Cascade / InsightFace)
+#   - "config/vision/config_vision_imx500.yaml"     (Sony IMX500 AI Camera: On-Sensor RPK SSD + ArcFace)
+#   - "config/vision/config_vision_ncnn.yaml"       (Pi5 CPU: YOLO26 NCNN + Cascade)
+#   - "config/vision/config_vision_libreyolo.yaml"  (Pi5 CPU: LibreYOLOXn + Cascade)
+vision_config: "config/vision/config_vision_cpu.yaml"
+
+# Audio stream configuration (Microphone & Speaker)
+audio:
+  input_sample_rate: 48000
+  input_chunk_ms: 300  # audio chunk size in ms
+  input_chunk_size: 1024
+  input_device_index: 0
+  input_device_name: 'USB ENC Audio Device'  # Optional name of input device (overrides index if found)
+  volume: 0.8
+  output_device_index: 1  # default to USB PnP Audio Device: Audio (hw:3,0)
+  output_sample_rate: 44100
+  output_chunk_ms: 300
+  output_chunk_size: 1024
+  output_device_name: 'USB PnP Audio Device'
+
+# Voice Activity Detection (VAD)
 vad:
   min_speech_duration_ms: 100
   min_silence_duration_ms: 500
@@ -29,7 +44,7 @@ vad:
   threshold: 0.6
   sample_rate: 44100
 
-# Automatic Speech Recognition (ASR) configuration
+# Automatic Speech Recognition (ASR / STT)
 asr:
   engine: "faster-whisper" # "whisper", "faster-whisper"
   model_size: "tiny"
@@ -38,14 +53,14 @@ asr:
   translate: false
   transformers: true
   transformers_engine: "huggingface" # "huggingface" or "onnxruntime"
-  device: "cpu"  # Pi5 : CPU (or "hailo")
+  device: "cpu"  # Pi5: CPU (or "hailo")
   compute_type: "int8"
   download_root: null # Let Python code build the path dynamically
-  skip_native_teardown: false  # Avoid native teardown segfaults on some ARM/PortAudio stacks
+  skip_native_teardown: false
   store_audio: true
   store_audio_path: ".tmp/asr.wav"
 
-
+# Wake word detection
 wake:
   wake_word: "hello_jarvis"
   backend: "wakeword"
@@ -57,80 +72,21 @@ wake:
   noise_suppression: true
   download_root: ".cache/audio/models/wakeword"
 
-audio:
-  input_sample_rate: 48000
-  input_chunk_ms: 300  # taille des chunks audio en ms
-  input_chunk_size: 1024
-  input_device_index: 0 # use system default when a mic is attached
-  input_device_name: 'USB ENC Audio Device'  # Optional name of input device to select (overrides index if found)
-  volume: 0.8  # half as loud
-  output_device_index: 1 # default to USB PnP Audio Device: Audio (hw:3,0)
-  output_sample_rate: 44100
-  output_chunk_ms: 300  # taille des chunks audio en ms
-  output_chunk_size: 1024
-  output_device_name: 'USB PnP Audio Device'  # Optional name of output device to select (overrides index if found)
+# Text-to-Speech (TTS)
+tts:
+  engine: "piper"
+  model_name: "jarvis-medium.onnx"
+  model_path: null # Let Python code build the path dynamically
+  cli_mode: false
+  device: "cpu"
+  length_scale: 1.0
+  noise_scale: 1.0
+  noise_w_scale: 1.0
+  normalize_audio: true
+  speed: 1.0
+  volume: 0.5
 
-# Platform-specific configuration
-platform:
-  cpu_cores: 2  # Limit CPU cores for multiprocessing on Pi5
-  pi: true  # Automatically detect Raspberry Pi and apply tuning
-
-# Vision configuration
-vision:
-  object_model_type: "yolo_imx500"  # "yolo" (CPU), "yolo_hailo" (Hailo NPU), "yolo_imx500" (Sony IMX500)
-  object_model_name: "imx500_network_ssd_mobilenetv2"  # Options: "yolo26n.onnx" (default fast), "LibreYOLOXn.onnx" (100% free / MIT license),
-  object_model_path: "/usr/share/imx500-models/imx500_network_ssd_mobilenetv2_fpnlite_320x320_pp.rpk"  # Let Python code build the path dynamically: models for imx500 - default "/usr/share/imx500-models/imx500_network_ssd_mobilenetv2_fpnlite_320x320_pp.rpk"
-  object_label_path: "data/dataset_vision/coco_labels.txt"
-  object_device: "cpu"  # CPU or "hailo"
-  object_inference_framework: "onnx" # "ncnn"
-  object_nms: False  # Enable NMS in Python (after export)
-  object_image_size: 640  # Image size for YOLO model
-  object_recognition_threshold: 0.5
-  face_detector_type: "insightface"  # "cascade", "insightface", "hailo", "imx500"
-  face_model_name: "buffalo_l" # "imx500_yolo11n.rpk" # "buffalo_l"  #"buffalo_l" #"haarcascade_frontalface_default.xml" , "buffalo_l", "arcface_r100_v1.onnx"  for insightface
-  face_model_path: null # "/data/imx500_yolo11n.rpk" # for "/data/imx500_yolo11n.rpk" imx500 # null for insightface
-  face_recognition_threshold: 0.4
-  post_processing_enabled: false
-  post_processing_model: "buffalo_l"
-  post_processing_model_type: "insightface"
-  post_processing_model_path: null # Let Python code build the path dynamically
-  post_processing_image_size: 640
-  enable_face_detection: true
-  enable_face_recognition: true
-  enable_object_detection: true
-  face_dataset_path: "data/face_dataset/"
-  object_dataset_path: "data/object_dataset/"
-
-  # Model resolution table mapping model names/types to resolution (width x height)
-  model_resolutions:
-    "LibreYOLOXn.onnx":
-      width: 416
-      height: 416
-    "yolo26n.onnx":
-      width: 640
-      height: 640
-    "yolo11n.onnx":
-      width: 640
-      height: 640
-    "buffalo_l":
-      width: 640
-      height: 640
-    "imx500":
-      width: 640
-      height: 480
-    "default":
-      width: 1080
-      height: 720
-
-  camera:
-    camera_index: 0
-    frame_width: 1080
-    frame_height: 720
-    format: "RGB888" # "YUV420" or "RGB888"
-    lores_frame_width: 320
-    lores_frame_height: 240
-    lores_format: "YUV420"
-# Local LLM settings for fallbacks or open-ended queries
+# Local LLM settings
 llm:
   api_type: "ollama"
   model: "llama3.2:latest"

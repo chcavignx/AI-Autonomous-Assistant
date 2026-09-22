@@ -43,10 +43,7 @@ class WebFaceIdentify:
         self.current_camera = None
 
         # Load dataset path from config or fallback
-        if hasattr(self.cfg.vision, "face_dataset_path") and self.cfg.vision.face_dataset_path:
-            self.dataset_dir = self.cfg.vision.face_dataset_path
-        else:
-            self.dataset_dir = output_dir
+        self.dataset_dir = str(self.cfg.vision.face_dataset_full_path or output_dir)
 
         self.fps = 0
         self.frame_count = 0
@@ -64,6 +61,22 @@ class WebFaceIdentify:
         self.load_dataset()
 
         self.initialize_cameras()
+
+    def stop(self) -> None:
+        """Stop camera and release recognizer resources."""
+        self.running = False
+        if self.current_camera and self.current_camera.get("camera"):
+            try:
+                self.current_camera["camera"].stop()
+                self.current_camera["camera"].close()
+            except Exception:
+                pass
+        if hasattr(self, "recognizer") and hasattr(self.recognizer, "stop"):
+            try:
+                self.recognizer.stop()
+            except Exception:
+                pass
+
 
     def load_dataset(self):
         """Load known faces from dataset directory"""
