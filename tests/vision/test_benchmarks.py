@@ -3,45 +3,41 @@
 from __future__ import annotations
 
 import csv
-import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
-
-ROOT_DIR = Path(__file__).resolve().parent.parent.parent
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
-from examples.vision.benchmarks.bench_combinations import (  # ruff: ignore[module-import-not-at-top-of-file]
-    _init_object_detector,  # ruff: ignore[import-private-name]
-    _load_or_create_frame,  # ruff: ignore[import-private-name]
+from examples.vision.benchmarks.bench_combinations import (
+    _init_object_detector,
+    _load_or_create_frame,
     benchmark_pipeline,
 )
-from examples.vision.benchmarks.bench_detectors import (  # ruff: ignore[module-import-not-at-top-of-file]
-    _run_bench_suite,  # ruff: ignore[import-private-name]
+from examples.vision.benchmarks.bench_detectors import (
+    _run_bench_suite,
     load_or_create_image,
 )
-from examples.vision.benchmarks.bench_vision_all import (  # ruff: ignore[module-import-not-at-top-of-file]
+from examples.vision.benchmarks.bench_vision_all import (
     FrameSource,
-    _aggregate,  # ruff: ignore[import-private-name]
-    _detect_face_status,  # ruff: ignore[import-private-name]
-    _detect_object_status,  # ruff: ignore[import-private-name]
-    _fps_bar_section,  # ruff: ignore[import-private-name]
-    _latency_bar_section,  # ruff: ignore[import-private-name]
-    _null_result,  # ruff: ignore[import-private-name]
-    _run_face_benchmark,  # ruff: ignore[import-private-name]
-    _run_object_benchmark,  # ruff: ignore[import-private-name]
+    _aggregate,
+    _detect_face_status,
+    _detect_object_status,
+    _fps_bar_section,
+    _latency_bar_section,
+    _null_result,
+    _run_face_benchmark,
+    _run_object_benchmark,
     save_csv,
     save_markdown,
 )
-from examples.vision.benchmarks.compare_bench_phases import (  # ruff: ignore[module-import-not-at-top-of-file]
+from examples.vision.benchmarks.compare_bench_phases import (
     load_bench_csv,
     summarize,
 )
-from src.utils.metrics import ThroughputMeter  # ruff: ignore[module-import-not-at-top-of-file]
-from src.vision.face_detector import CascadeFaceDetector  # ruff: ignore[module-import-not-at-top-of-file]
+from src.utils.metrics import ThroughputMeter
+from src.vision.face_detector import CascadeFaceDetector
+
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 
 # ─────────────────────────────────────────────────────────────────────────────
 # bench_vision_all.py tests

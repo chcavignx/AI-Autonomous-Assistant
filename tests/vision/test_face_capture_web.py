@@ -3,22 +3,15 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
+from examples.vision.face_capture_web import WebFaceCapture
 
-# Ensure project root is in sys.path
-ROOT_DIR = Path(__file__).resolve().parent.parent.parent
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
-# Mock picamera2 before importing
+# Mock picamera2 for testing environment
 sys.modules["picamera2"] = MagicMock()
 sys.modules["picamera2"].Picamera2 = MagicMock()
-
-from examples.vision.face_capture_web import WebFaceCapture  # ruff: ignore[module-import-not-at-top-of-file]
 
 pytestmark = pytest.mark.basic
 

@@ -82,27 +82,30 @@ class YoloHailoDetector(BaseDetector):
 
         try:
             try:
-                from hailo_platform import FormatType, HailoSchedulingAlgorithm, VDevice
+                import hailo_platform as _hailo
             except ImportError:
-                import hailort as _hailort
+                import hailort as _hailo  # pyright: ignore[reportMissingImports]
 
-                VDevice = _hailort.VDevice  # ruff: ignore[non-lowercase-variable-in-function]
-                HailoSchedulingAlgorithm = getattr(_hailort, "HailoSchedulingAlgorithm", None)  # ruff: ignore[non-lowercase-variable-in-function]
-                FormatType = getattr(_hailort, "FormatType", None)  # ruff: ignore[non-lowercase-variable-in-function]
+            vdevice_cls = getattr(_hailo, "VDevice", None)
+            if vdevice_cls is None:
+                raise ImportError
 
-            if hasattr(VDevice, "create_params") and HailoSchedulingAlgorithm is not None:
-                params = VDevice.create_params()
-                params.scheduling_algorithm = HailoSchedulingAlgorithm.ROUND_ROBIN
+            hailo_sched_algo = getattr(_hailo, "HailoSchedulingAlgorithm", None)
+            format_type = getattr(_hailo, "FormatType", None)
+
+            if hasattr(vdevice_cls, "create_params") and hailo_sched_algo is not None:
+                params = vdevice_cls.create_params()
+                params.scheduling_algorithm = hailo_sched_algo.ROUND_ROBIN
                 params.group_id = "SHARED"
-                self.vdevice = VDevice(params)
+                self.vdevice = vdevice_cls(params)
             else:
-                self.vdevice = VDevice()
+                self.vdevice = vdevice_cls()
 
             self.infer_model = self.vdevice.create_infer_model(hef_path)
-            if FormatType is not None:
+            if format_type is not None:
                 with contextlib.suppress(Exception):
                     for out_meta in self.infer_model.outputs:
-                        out_meta.set_format_type(FormatType.FLOAT32)
+                        out_meta.set_format_type(format_type.FLOAT32)
             self.configured_infer_model = self.infer_model.configure()
             self.use_hailo = True
             logger.info("Successfully initialized Hailo NPU object detector with model: %s", hef_path)
