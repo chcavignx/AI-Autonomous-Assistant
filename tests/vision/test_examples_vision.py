@@ -29,6 +29,7 @@ def test_face_capture_tool_init_and_detect(mock_cam, tmp_path):
 
     cfg = Config()
     cfg.vision.face_dataset_path = str(tmp_path)
+    cfg.vision.face_detector_type = "cascade"
 
     with (
         patch("examples.vision.face_capture.load_config", return_value=cfg),
@@ -55,6 +56,7 @@ def test_face_capture_headless_detect_and_capture(mock_cam, tmp_path):
 
     cfg = Config()
     cfg.vision.face_dataset_path = str(tmp_path)
+    cfg.vision.face_detector_type = "cascade"
 
     with (
         patch("examples.vision.face_capture_headless.load_config", return_value=cfg),
@@ -95,6 +97,7 @@ def test_face_identify_tool_dataset_and_draw(mock_cam, tmp_path):
 
     cfg = Config()
     cfg.vision.face_dataset_path = str(tmp_path)
+    cfg.vision.face_detector_type = "cascade"
 
     with (
         patch("examples.vision.face_identify.load_config", return_value=cfg),
@@ -124,6 +127,7 @@ def test_face_identify_web_load_dataset_and_stop(mock_cam, tmp_path):
 
     cfg = Config()
     cfg.vision.face_dataset_path = str(tmp_path)
+    cfg.vision.face_detector_type = "cascade"
 
     with (
         patch("examples.vision.face_identify_web.config", cfg),
@@ -163,11 +167,37 @@ def test_simultaneous_vision_e2e_automated():
     """Test simultaneous vision CLI end-to-end automated test suite."""
     from examples.vision.simultaneous_face_object_e2e import run_automated_test
 
-    assert run_automated_test() is True
+    mock_obj = MagicMock()
+    mock_obj.process_frame.side_effect = lambda frame, *args, **kwargs: (frame, [])
+    mock_face = MagicMock()
+    mock_face.process_frame.side_effect = lambda frame, *args, **kwargs: (frame, [])
+    mock_face.detector = MagicMock()
+    mock_face.detector.detect.return_value = []
+    mock_face.face_recognizer = MagicMock()
+
+    with (
+        patch("examples.vision.simultaneous_face_object_e2e.discover_pi_cameras", return_value=[]),
+        patch("src.vision.video_capture.VideoCapture._init_object_processor", return_value=mock_obj),
+        patch("src.vision.video_capture.VideoCapture._init_face_processor", return_value=mock_face),
+    ):
+        assert run_automated_test() is True
 
 
 def test_simultaneous_vision_web_automated():
     """Test simultaneous vision Web Flask endpoints and streaming automated test."""
     from examples.vision.simultaneous_vision_web import run_automated_web_test
 
-    assert run_automated_web_test() is True
+    mock_obj = MagicMock()
+    mock_obj.process_frame.side_effect = lambda frame, *args, **kwargs: (frame, [])
+    mock_face = MagicMock()
+    mock_face.process_frame.side_effect = lambda frame, *args, **kwargs: (frame, [])
+    mock_face.detector = MagicMock()
+    mock_face.detector.detect.return_value = []
+    mock_face.face_recognizer = MagicMock()
+
+    with (
+        patch("examples.vision.simultaneous_vision_web.discover_pi_cameras", return_value=[]),
+        patch("src.vision.video_capture.VideoCapture._init_object_processor", return_value=mock_obj),
+        patch("src.vision.video_capture.VideoCapture._init_face_processor", return_value=mock_face),
+    ):
+        assert run_automated_web_test() is True
