@@ -7,16 +7,20 @@ import logging.config
 import sys
 from collections.abc import Mapping
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from .sysutils import detect_raspberry_pi_model, limit_cpu_for_multiprocessing
 
 # Project Root
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 USER_DIR = Path.home()
+
+module_name = __name__
+lib_name = module_name.split(".")[1]
+logger = logging.getLogger(lib_name)
 
 
 class PathConfig(BaseModel):
@@ -27,6 +31,7 @@ class PathConfig(BaseModel):
     cache: str = ".cache"
     models: str = "models"
     tmp: str = ".tmp"
+    system: str = "/usr/share"
 
     @property
     def src_path(self) -> Path:
@@ -121,11 +126,12 @@ class TTSConfig(PathConfig):
     def full_model_path(self) -> Path:
         """The full path to the TTS model."""
         if self.model_path:
-            p = ROOT_DIR / self.model_path
-            # If it's already a file path, return it
+            p = Path(self.model_path)
             if p.suffix in {".onnx", ".bin", ".pt", ".tflite"}:
                 return p.resolve()
-            return (p / self.engine / self.model_name).resolve()
+            p = p / self.model_name
+            if p.suffix in {".onnx", ".bin", ".pt", ".tflite"}:
+                return p.resolve()
         return self.models_audio_path / self.engine / self.model_name
 
 
@@ -149,7 +155,7 @@ class WakeConfig(PathConfig):
     def download_path(self) -> Path:
         """The download path for the wakeword model."""
         if self.download_root:
-            return (ROOT_DIR / self.download_root).resolve()
+            return Path(self.download_root).resolve()
         return self.models_audio_path / "wakeword"
 
     @property
@@ -254,43 +260,73 @@ class CameraConfig(BaseModel):
 class VisionConfig(PathConfig):
     """Configuration for Vision settings."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
-    face_detector_type: str = "cascade"  # "cascade", "insightface", "imx500"
-    face_model_name: str = "haarcascade_frontalface_default.xml"  # "buffalo_l" for insightface
+    # --- Face Detection & Recognition Configuration ---
+    face_detector_type: str = "insightface"  # "cascade", "insightface", "hailo", "imx500"
+    face_model_name: str = "buffalo_l"  # "haarcascade_frontalface_default.xml", "buffalo_l", "scrfd_2.5g.hef"
     face_model_path: str | None = None
     face_recognition_threshold: float = 0.4
+    face_detector_device: str = "cpu"  # "cpu", "hailo", "imx500"
+    face_detector_inference_framework: str = "onnx"  # "onnx", "ncnn", "hef", "rpk"
+    enable_face_detection: bool = True
+    enable_face_recognition: bool = True
+    face_dataset_path: str | None = None
+
+    # --- Face Post-Processing & Embeddings (ArcFace) ---
     post_processing_enabled: bool = False
-    post_processing_model_name: str = "arcface_r100_v1.onnx"  # "buffalo_l" for insightface
-    post_processing_model_type: str = (
-        "insightface"  # "insightface" (for openvino arcface_r100_v1.onnx), "buffalo_l" for buffalo_l, "hailo" for hailo
+    post_processing_model_name: str = Field(
+        default="buffalo_l",
+        validation_alias=AliasChoices("post_processing_model_name", "post_processing_model"),
     )
+    post_processing_model_type: str = "insightface"  # "insightface", "hailo"
     post_processing_model_path: str | None = None
     post_processing_image_size: int = 640
-    post_processing_inference_framework: str = "onnx"  # "hef" for Hailo
-    object_model_type: str = "yolo"  # "yolo" (CPU), "yolo_hailo", "yolo_imx500", "libreyolo" (CPU)
+    post_processing_model_device: str = "cpu"  # "cpu", "hailo", "imx500"
+    post_processing_inference_framework: str = "onnx"  # "onnx", "hef"
+    async_face_recognition: bool = True
+    face_recognition_interval: float = 1.5
+
+    # --- Object Detection Configuration ---
+    object_model_type: str = "yolo"  # "yolo", "yolo_hailo", "yolo_imx500", "libreyolo"
     object_model_name: str = "yolo26n.onnx"
     object_model_path: str | None = None
     object_label_path: str | None = None
-    object_device: str = "cpu"  # CPU or "hailo"
-    object_inference_framework: str = "onnx"  # "hef" for Hailo
+    object_device: str = "cpu"  # "cpu", "hailo", "imx500"
+    object_inference_framework: str = "onnx"  # "onnx", "ncnn", "hef"
     object_nms: bool = False  # Enable NMS in Python (after export)
     object_image_size: int = 640  # Image size for YOLO model
     object_recognition_threshold: float = 0.25
-    enable_face_detection: bool = True
-    enable_face_recognition: bool = True
     enable_object_detection: bool = True
-    face_dataset_path: str | None = None
+    enable_object_recognition: bool = True
     object_dataset_path: str | None = None
 
+    # --- Object Post-Processing ---
+    object_post_processing_enabled: bool = False
+    object_post_processing_model_name: str = "buffalo_l"
+    object_post_processing_model_type: str = "insightface"
+    object_post_processing_model_device: str = "cpu"  # "cpu", "hailo", "imx500"
+    object_post_processing_model_path: str | None = None
+    object_post_processing_image_size: int = 640
+    object_post_processing_inference_framework: str = "onnx"
+
+    # --- Resolution & Camera Configuration ---
     model_resolutions: dict[str, ModelResolution] = Field(
         default_factory=lambda: {
             "LibreYOLOXn.onnx": ModelResolution(width=416, height=416),
             "LibreYOLOXn": ModelResolution(width=416, height=416),
             "yolo26n.onnx": ModelResolution(width=640, height=640),
+            "yolo26n": ModelResolution(width=640, height=640),
             "yolo11n.onnx": ModelResolution(width=640, height=640),
+            "yolo11n": ModelResolution(width=640, height=640),
+            "yolov8n.hef": ModelResolution(width=640, height=640),
+            "yolov8s_h8l.hef": ModelResolution(width=640, height=640),
+            "yolo11n.hef": ModelResolution(width=640, height=640),
+            "scrfd_2.5g.hef": ModelResolution(width=640, height=640),
+            "scrfd_2.5g_h8l.hef": ModelResolution(width=640, height=640),
             "buffalo_l": ModelResolution(width=640, height=640),
             "imx500": ModelResolution(width=640, height=480),
+            "hailo": ModelResolution(width=640, height=640),
             "default": ModelResolution(width=1080, height=720),
         }
     )
@@ -303,6 +339,7 @@ class VisionConfig(PathConfig):
         Args:
             model_name: Optional model name string. If None, checks object_model_name, face_model_name,
                         or object_model_type/face_detector_type.
+
 
         Returns:
             Tuple of (width, height).
@@ -321,20 +358,27 @@ class VisionConfig(PathConfig):
             if self.face_detector_type:
                 candidates.append(self.face_detector_type)
 
+        # 1. Exact match
         for candidate in candidates:
-            # 1. Exact match
             if candidate in self.model_resolutions:
                 res = self.model_resolutions[candidate]
                 return res.width, res.height
 
-            # 2. Case-insensitive key or substring match
+        # 2. Case-insensitive exact match
+        for candidate in candidates:
             cand_lower = candidate.lower()
             for key, res in self.model_resolutions.items():
-                key_lower = key.lower()
-                if key_lower == cand_lower or key_lower in cand_lower or cand_lower in key_lower:
+                if key.lower() == cand_lower:
                     return res.width, res.height
 
-        # Fallback to default in table if available, else camera config defaults
+        # 3. Stem match (e.g. 'yolo26n.onnx' -> 'yolo26n')
+        for candidate in candidates:
+            stem = Path(candidate).stem.lower()
+            for key, res in self.model_resolutions.items():
+                if Path(key).stem.lower() == stem:
+                    return res.width, res.height
+
+        # 4. Fallback to default in table if available, else camera config defaults
         if "default" in self.model_resolutions:
             res = self.model_resolutions["default"]
             return res.width, res.height
@@ -345,53 +389,168 @@ class VisionConfig(PathConfig):
     @property
     def object_model_full_path(self) -> Path:
         """The resolved full path to the object detection model."""
-        raw_path = self.object_model_path  # Access Pydantic field value
+        raw_path = self.object_model_path
         if raw_path:
-            p = ROOT_DIR / raw_path
+            p = Path(raw_path)
             if p.suffix in {".onnx", ".pt", ".hef", ".rpk"}:
-                return p.resolve()
-            return (p / self.object_model_type / self.object_model_name).resolve()
+                return p.resolve() if p.is_absolute() else (ROOT_DIR / p).resolve()
+
         base_name = (
             Path(self.object_model_name).stem
             if Path(self.object_model_name).suffix in {".onnx", ".pt", ".hef", ".rpk"}
             else self.object_model_name
         )
+        base_dir = (
+            (Path(raw_path).resolve() if Path(raw_path).is_absolute() else (ROOT_DIR / raw_path).resolve())
+            if raw_path
+            else self.models_vision_path
+        )
+
         if self.object_inference_framework in {"onnx", "hef", "rpk"}:
-            return (
-                self.models_vision_path / self.object_model_type / f"{base_name}.{self.object_inference_framework}"
-            ).resolve()
+            cand_device = (
+                base_dir
+                / self.object_model_type
+                / self.object_device
+                / f"{base_name}.{self.object_inference_framework}"
+            )
+            if cand_device.exists():
+                return cand_device.resolve()
+            return (base_dir / self.object_model_type / f"{base_name}.{self.object_inference_framework}").resolve()
         if self.object_inference_framework == "ncnn":
-            return (self.models_vision_path / self.object_model_type / f"{base_name}_ncnn_model").resolve()
-        msg = f"Unknown inference framework: {self.object_inference_framework}"
+            cand_device = base_dir / self.object_model_type / self.object_device / f"{base_name}_ncnn_model"
+            if cand_device.exists():
+                return cand_device.resolve()
+            return (base_dir / self.object_model_type / f"{base_name}_ncnn_model").resolve()
+        msg = f"Unable to resolve object model path for inference framework: {self.object_model_name}"
         raise ValueError(msg)
 
     @property
     def object_label_full_path(self) -> Path | None:
         """The resolved full path to the object detection labels file."""
         if self.object_label_path:
-            p = ROOT_DIR / self.object_label_path
-            return p.resolve()
+            p = Path(self.object_label_path)
+            return p.resolve() if p.is_absolute() else (ROOT_DIR / self.object_label_path).resolve()
         return None
 
     @property
     def face_detector_model_path(self) -> Path:
         """The full path to the detector model."""
         if self.face_model_path:
-            p = ROOT_DIR / self.face_model_path
-            if p.suffix in {".onnx", ".hef", ".rpk"}:
+            p = Path(self.face_model_path)
+            if p.suffix in {".onnx", ".hef", ".rpk", ".xml"}:
                 return p.resolve()
-        return self.models_vision_path / self.face_detector_type / self.face_model_name
+            p = p / self.face_model_name
+            if p.suffix in {".onnx", ".hef", ".rpk", ".xml"}:
+                return p.resolve()
+        cand_device = (
+            self.models_vision_path / self.face_detector_type / self.face_detector_device / self.face_model_name
+        )
+        if cand_device.exists():
+            return cand_device.resolve()
+        return (self.models_vision_path / self.face_detector_type / self.face_model_name).resolve()
+
+    @property
+    def face_model_full_path(self) -> Path:
+        """The full path to the face model."""
+        return self.face_detector_model_path
 
     @property
     def post_processing_model_full_path(self) -> Path:
         """The full path to the post-processing model."""
         raw_path = self.post_processing_model_path
         if raw_path:
-            p = ROOT_DIR / raw_path
+            p = Path(raw_path, self.post_processing_model_name)
             if p.suffix in {".onnx", ".hef"}:
                 return p.resolve()
-            return (p / self.post_processing_model_type / self.post_processing_model_name).resolve()
+        for base in [
+            self.models_vision_path,
+            ROOT_DIR / ".cache" / "vision" / "models",
+            ROOT_DIR / "data" / "models" / "vision",
+        ]:
+            cand_device = (
+                base
+                / self.post_processing_model_type
+                / self.post_processing_model_device
+                / self.post_processing_model_name
+            )
+            if cand_device.exists():
+                return cand_device.resolve()
+            cand = base / self.post_processing_model_type / self.post_processing_model_name
+            if cand.exists():
+                return cand.resolve()
+            # If directory or alias is configured (e.g. buffalo_l)
+            cand_r50_device = (
+                base
+                / self.post_processing_model_type
+                / self.post_processing_model_device
+                / "buffalo_l"
+                / "w600k_r50.onnx"
+            )
+            if cand_r50_device.exists():
+                return cand_r50_device.resolve()
+            cand_r50 = base / self.post_processing_model_type / "buffalo_l" / "w600k_r50.onnx"
+            if cand_r50.exists():
+                return cand_r50.resolve()
+
         return (self.models_vision_path / self.post_processing_model_type / self.post_processing_model_name).resolve()
+
+    @property
+    def post_processing_object_model_full_path(self) -> Path:
+        """The full path to the post-processing object model."""
+        raw_path = self.object_post_processing_model_path
+        if raw_path:
+            p = Path(raw_path, self.object_post_processing_model_name)
+            if p.suffix in {".onnx", ".hef"}:
+                return p.resolve()
+        for base in [
+            self.models_vision_path,
+            ROOT_DIR / ".cache" / "vision" / "models",
+            ROOT_DIR / "data" / "models" / "vision",
+        ]:
+            cand_device = (
+                base
+                / self.object_post_processing_model_type
+                / self.object_post_processing_model_device
+                / self.object_post_processing_model_name
+            )
+            if cand_device.exists():
+                return cand_device.resolve()
+            cand = base / self.object_post_processing_model_type / self.object_post_processing_model_name
+            if cand.exists():
+                return cand.resolve()
+            # If directory or alias is configured (e.g. buffalo_l)
+            cand_r50_device = (
+                base
+                / self.object_post_processing_model_type
+                / self.object_post_processing_model_device
+                / "buffalo_l"
+                / "w600k_r50.onnx"
+            )
+            if cand_r50_device.exists():
+                return cand_r50_device.resolve()
+            cand_r50 = base / self.object_post_processing_model_type / "buffalo_l" / "w600k_r50.onnx"
+            if cand_r50.exists():
+                return cand_r50.resolve()
+
+        return (
+            self.models_vision_path / self.object_post_processing_model_type / self.object_post_processing_model_name
+        ).resolve()
+
+    @property
+    def face_dataset_full_path(self) -> Path | None:
+        """Resolved path to face dataset directory."""
+        if self.face_dataset_path:
+            p = Path(self.face_dataset_path)
+            return p.resolve() if p.is_absolute() else (ROOT_DIR / self.face_dataset_path).resolve()
+        return None
+
+    @property
+    def object_dataset_full_path(self) -> Path | None:
+        """Resolved path to object dataset directory."""
+        if self.object_dataset_path:
+            p = Path(self.object_dataset_path)
+            return p.resolve() if p.is_absolute() else (ROOT_DIR / self.object_dataset_path).resolve()
+        return None
 
 
 class LLMConfig(BaseModel):
@@ -479,11 +638,43 @@ class Config:
         self.asr.faster_model_size = value
 
 
+def _deep_merge_dicts(base: dict[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:
+    """Recursively merge override dictionary into base dictionary."""
+    result = dict(base)
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, Mapping):
+            result[key] = _deep_merge_dicts(result[key], cast("Mapping[str, Any]", value))
+        else:
+            result[key] = value
+    return result
+
+
+def _resolve_subconfig_path(sub_path_str: str, parent_dir: Path) -> Path:
+    """Resolve sub-config path relative to parent directory, config/vision, or project root."""
+    cand = Path(sub_path_str)
+    if cand.is_absolute():
+        return cand.resolve()
+
+    cand_parent = (parent_dir / sub_path_str).resolve()
+    if cand_parent.exists():
+        return cand_parent
+
+    cand_root = (ROOT_DIR / sub_path_str).resolve()
+    if cand_root.exists():
+        return cand_root
+
+    cand_vision = (ROOT_DIR / "config" / "vision" / sub_path_str).resolve()
+    if cand_vision.exists():
+        return cand_vision
+
+    return cand_root
+
+
 def load_config(config_path: Path | None = None) -> Config:
-    """Load the configuration from a YAML file.
+    """Load the configuration from a YAML file (supports vision_config profiles and includes).
 
     Returns:
-        The parsed voice-agent configuration.
+        The parsed voice/vision agent configuration.
 
     Raises:
         ValueError: If the config path resolves outside the allowed roots.
@@ -491,19 +682,26 @@ def load_config(config_path: Path | None = None) -> Config:
     """
     if config_path is None:
         config_path = ROOT_DIR / "config.yaml"
+    elif isinstance(config_path, str):
+        config_path = Path(config_path)
 
     # Security: Resolve paths and validate that the config is within allowed directories
     is_safe = True
     try:
         abs_config_path = config_path.resolve()
+
+        import tempfile
+
         abs_root_dir = ROOT_DIR.resolve()
         abs_user_dir = USER_DIR.resolve()
+        temp_dir = Path(tempfile.gettempdir()).resolve()
 
-        # Check if the config path is within the project root or user directory
+        # Check if the config path is within the project root, user directory, or system temp
         is_safe = (
-            abs_config_path in {abs_root_dir, abs_user_dir}
+            abs_config_path in {abs_root_dir, abs_user_dir, temp_dir}
             or abs_root_dir in abs_config_path.parents
             or abs_user_dir in abs_config_path.parents
+            or temp_dir in abs_config_path.parents
         )
     except (OSError, RuntimeError):
         # If path cannot be resolved, but we are trying to open it, that's a risk.
@@ -526,10 +724,41 @@ def load_config(config_path: Path | None = None) -> Config:
     if config_dict is None:
         return Config()
 
-    if isinstance(config_dict, Mapping):
-        return Config.from_mapping(cast("Mapping[str, object]", config_dict))
+    if not isinstance(config_dict, Mapping):
+        return Config()
 
-    return Config()
+    raw_dict: dict[str, Any] = dict(config_dict)
+
+    # 1. Process generic includes: [...]
+    merged_root: dict[str, Any] = {}
+    includes = raw_dict.pop("includes", None)
+    if isinstance(includes, list):
+        for inc in includes:
+            inc_path = _resolve_subconfig_path(str(inc), config_path.parent)
+            if inc_path.exists():
+                with inc_path.open("r", encoding="utf-8") as inc_f:
+                    inc_data = yaml.safe_load(inc_f)
+                    if isinstance(inc_data, Mapping):
+                        merged_root = _deep_merge_dicts(merged_root, cast("Mapping[str, Any]", inc_data))
+
+    merged_root = _deep_merge_dicts(merged_root, raw_dict)
+
+    # 2. Process vision_config modular profile (e.g. config/vision/config_vision_hailo.yaml)
+    vision_sub = merged_root.pop("vision_config", None)
+    if vision_sub and isinstance(vision_sub, str):
+        vis_path = _resolve_subconfig_path(vision_sub, config_path.parent)
+        if vis_path.exists():
+            with vis_path.open("r", encoding="utf-8") as vis_f:
+                vis_data = yaml.safe_load(vis_f)
+                if isinstance(vis_data, Mapping):
+                    inline_vision = merged_root.get("vision", {})
+                    if isinstance(inline_vision, Mapping):
+                        merged_vision = _deep_merge_dicts(dict(vis_data), cast("Mapping[str, Any]", inline_vision))
+                    else:
+                        merged_vision = dict(vis_data)
+                    merged_root["vision"] = merged_vision
+
+    return Config.from_mapping(cast("Mapping[str, object]", merged_root))
 
 
 # Global config instance

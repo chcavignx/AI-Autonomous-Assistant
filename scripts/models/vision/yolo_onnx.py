@@ -21,16 +21,17 @@ from src.utils.config import config
 DRY_RUN = os.getenv("DRY_RUN", "0") == "1"
 
 # Target directory
-CACHE_DIR = config.paths.models_vision_path / "yolo"
+CACHE_DIR = config.paths.models_vision_path / "yolo" / "cpu"
 if DRY_RUN:
     print(f"[DRY-RUN] Would create directory at {CACHE_DIR}")
 else:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-
+# re for yolo face: "https://github.com/yakhyo/yolov8-face-onnx-inference.git"
 # URL mapping
 URLS = {
     "yolo26n-cls.pt": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo26n-cls.pt",
     "yolo26n.pt": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo26n.pt",
+    "yolov8n-face.onnx": "https://github.com/yakhyo/yolov8-face-onnx-inference/releases/download/weights/yolov8n-face.onnx",
 }
 
 
@@ -92,6 +93,14 @@ def run() -> None:
             print(f"[DRY-RUN] Would save NCNN model to {_deth_path}")
         else:
             print(f"NCNN model saved to {_deth_path}")
+
+    # face detection model
+    dest = CACHE_DIR / "yolov8n-face.onnx"
+    if not DRY_RUN and dest.exists():
+        print(f"yolov8n-face.onnx already exists at {dest}. Skipping.")
+    else:
+        download_file(URLS["yolov8n-face.onnx"], dest)
+
 
 if __name__ == "__main__":
     run()

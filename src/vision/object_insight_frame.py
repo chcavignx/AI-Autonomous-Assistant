@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
     from src.vision.base import DetectionDict
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__.split(".")[1])
 
 
 class ObjectInsightFrame:
@@ -36,11 +36,16 @@ class ObjectInsightFrame:
         self.cfg = cfg or load_config()
         if detector is not None:
             self.detector = detector
-        elif self.cfg.vision.object_model_type == "yolo_imx500":
+        elif self.cfg.vision.object_model_type in {"yolo_hailo", "hailo"}:
+            from src.vision.yolo_hailo import YoloHailoDetector
+
+            self.detector = YoloHailoDetector(self.cfg)
+        elif self.cfg.vision.object_model_type in {"yolo_imx500", "imx500"}:
             from src.vision.yolo_imx500 import Imx500Detector
 
             self.detector = Imx500Detector()
         else:
+            # default self.cfg.vision.object_model_type in {"yolo_cpu","cpu"}:
             self.detector = YoloCpuDetector(self.cfg)
 
     def process_frame(
@@ -139,3 +144,8 @@ class ObjectInsightFrame:
                 )
 
         return annotated_frame, detections, results
+
+    def stop(self) -> None:
+        """Release underlying detector resources."""
+        if hasattr(self.detector, "stop"):
+            self.detector.stop()

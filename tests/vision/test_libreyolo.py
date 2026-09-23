@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-from src.vision.yolo_cpu import YoloCpuDetector
+from src.vision.yolo_cpu import LibreYoloOnnxPredictor, YoloCpuDetector
 
 pytestmark = pytest.mark.basic
 
@@ -47,10 +47,47 @@ def test_yolo_cpu_detector_libreyolo_load() -> None:
 
 def test_libre_yolo_onnx_predictor_missing_onnxruntime() -> None:
     """Test that LibreYoloOnnxPredictor raises ImportError when onnxruntime is missing."""
-    from src.vision.yolo_cpu import LibreYoloOnnxPredictor
-
     with (
         patch.dict("sys.modules", {"onnxruntime": None}),
         pytest.raises(ImportError, match="onnxruntime is required for LibreYoloOnnxPredictor"),
     ):
         LibreYoloOnnxPredictor("dummy.onnx")
+
+
+def test_libre_yolo_onnx_predictor_predict_mocked() -> None:
+    """Test LibreYoloOnnxPredictor predict flow with mocked ONNX runtime."""
+    mock_session = MagicMock()
+    mock_input_meta = MagicMock()
+    mock_input_meta.name = "images"
+    mock_input_meta.shape = [1, 3, 416, 416]
+    mock_session.get_inputs.return_value = [mock_input_meta]
+
+    # Output shape: [1, 3549, 85] (3549 anchors for 416x416 input)
+    dummy_output = np.zeros((1, 3549, 85), dtype=np.float32)
+    # Box: cx=200, cy=200, w=50, h=50, obj_conf=0.9, class 0 conf=0.9
+    dummy_output[0, 0, 0] = 200.0
+    dummy_output[0, 0, 1] = 200.0
+    dummy_output[0, 0, 2] = 50.0
+    dummy_output[0, 0, 3] = 50.0
+    dummy_output[0, 0, 4] = 0.95
+    dummy_output[0, 0, 5] = 0.95  # class 0 score
+
+    mock_session.run.return_value = [dummy_output]
+
+    mock_ort = MagicMock()
+    mock_ort.InferenceSession.return_value = mock_session
+
+    with patch.dict("sys.modules", {"onnxruntime": mock_ort}):
+        predictor = LibreYoloOnnxPredictor("dummy_libreyolo.onnx", names={0: "person"})
+        results = predictor.predict(np.zeros((416, 416, 3), dtype=np.uint8), conf=0.25)
+        assert len(results) == 1
+        res = results[0]
+        assert hasattr(res, "boxes")
+        assert len(res.boxes) == 1
+
+
+def test_yolo_cpu_detector_stop() -> None:
+    """Test YoloCpuDetector.stop() executes cleanly."""
+    with patch("src.vision.yolo_cpu.YOLO"):
+        detector = YoloCpuDetector(model_path="dummy.pt")
+        detector.stop()

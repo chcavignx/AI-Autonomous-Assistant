@@ -1,0 +1,89 @@
+# ==============================================================================
+# Vision Profile: CPU Baseline (No External Hardware Accelerator)
+# ==============================================================================
+# Target: Raspberry Pi 5 CPU without Hailo NPU or AI Camera.
+#
+# Supported Models:
+#   Object Detection (ONNX CPU):
+#     - yolo26n.onnx (default, 640x640)
+#     - yolo11n.onnx (640x640)
+#   Face Detection:
+#     - cascade (OpenCV Haar Cascade CPU, ~50+ FPS)
+#     - insightface (buffalo_l / RetinaFace ONNX CPU)
+#   Face Recognition:
+#     - buffalo_l (ArcFace ONNX CPU)
+# ==============================================================================
+
+# --- Object Detection Configuration ---
+object_model_type: "yolo"
+object_model_name: "yolo26n.onnx"
+object_model_path: null  # Auto-resolved in .cache/vision/models/yolo/
+object_label_path: null
+object_device: "cpu"
+object_inference_framework: "onnx"
+object_nms: false
+object_image_size: 640
+object_recognition_threshold: 0.5
+enable_object_detection: true
+enable_object_recognition: true
+object_dataset_path: "data/object_dataset/"
+
+# --- Object Post-Processing ---
+object_post_processing_enabled: false
+object_post_processing_model_name: "buffalo_l"
+object_post_processing_model_type: "insightface"
+object_post_processing_model_path: null
+object_post_processing_image_size: 640
+object_post_processing_inference_framework: "onnx"
+
+# --- Face Detection Configuration ---
+face_detector_type: "cascade"  # Fast CPU face detection
+face_model_name: "haarcascade_frontalface_default.xml"
+face_model_path: null  # Auto-resolved in .cache/vision/models/cascade/
+face_detector_device: "cpu"
+face_detector_inference_framework: "xml"
+face_recognition_threshold: 0.4
+enable_face_detection: true
+enable_face_recognition: true
+face_dataset_path: "data/face_dataset/"
+
+# --- Face Recognition & Embeddings (ArcFace Post-Processing) ---
+post_processing_enabled: true
+post_processing_model_name: "buffalo_l"
+post_processing_model_type: "insightface"
+post_processing_model_path: null
+post_processing_image_size: 640
+post_processing_inference_framework: "onnx"
+async_face_recognition: true
+face_recognition_interval: 1.5
+
+# --- Model Resolution Lookup Table ---
+model_resolutions:
+  "yolo26n.onnx":
+    width: 640
+    height: 640
+  "yolo26n":
+    width: 640
+    height: 640
+  "yolo11n.onnx":
+    width: 640
+    height: 640
+  "buffalo_l":
+    width: 640
+    height: 640
+  "haarcascade_frontalface_default.xml":
+    width: 640
+    height: 480
+  "default":
+    width: 1080
+    height: 720
+
+# --- Camera Configuration ---
+camera:
+  camera_index: 0
+  frame_width: 1080
+  frame_height: 720
+  format: "RGB888"
+  lores_frame_width: 640
+  lores_frame_height: 480
+  lores_format: "YUV420"

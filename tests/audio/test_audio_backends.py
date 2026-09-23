@@ -1,5 +1,7 @@
+import sys
 import unittest
-from unittest.mock import MagicMock
+from types import ModuleType
+from unittest.mock import MagicMock, patch
 
 import pytest
 from src.audio.audio_utils import get_audio_backend
@@ -9,6 +11,20 @@ from src.audio.audio_utils import get_audio_backend
 class TestAudioBackends(unittest.TestCase):
     def setUp(self):
         self.config = MagicMock()
+        self.mock_sd = ModuleType("sounddevice")
+        self.mock_sd.InputStream = MagicMock()
+        self.mock_sd.OutputStream = MagicMock()
+        self.mock_sd.play = MagicMock()
+        self.mock_sd.wait = MagicMock()
+        self.mock_sd.stop = MagicMock()
+        self.mock_sd.query_devices = MagicMock(return_value=[{"name": "mock_device"}])
+        self.mock_sd.default = MagicMock()
+        self.mock_sd.PortAudioError = Exception
+        self._patcher = patch.dict(sys.modules, {"sounddevice": self.mock_sd})
+        self._patcher.start()
+
+    def tearDown(self):
+        self._patcher.stop()
 
     def test_get_audio_backend_is_exclusive(self) -> None:
         # Verify that sounddevice is the only returned and available backend

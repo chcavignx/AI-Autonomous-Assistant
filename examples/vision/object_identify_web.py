@@ -63,6 +63,7 @@ class WebObjectIdentify:
                 'camera': cam,
                 'info': cam.get_info_str()
             })
+            cam.close()
             logger.info(f"✓ Camera {cam.index} detected")
 
         if not self.cameras:
@@ -99,7 +100,7 @@ class WebObjectIdentify:
             cam_index = idx
 
         self.cfg.vision.camera.camera_index = cam_index
-        if self.video_cap.running:
+        if self.video_cap.camera is not None:
             self.video_cap.stop()
         self.video_cap._initialize_camera()
         self.video_cap.start()
@@ -107,7 +108,7 @@ class WebObjectIdentify:
     def stop(self):
         """Stop camera capture and terminate frame generator loop."""
         self.running = False
-        if hasattr(self, "video_cap") and self.video_cap.running:
+        if hasattr(self, "video_cap"):
             self.video_cap.stop()
 
     def set_threshold(self, threshold: float):

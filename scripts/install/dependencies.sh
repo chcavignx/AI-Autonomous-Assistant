@@ -26,4 +26,4 @@ python3-matplotlib
 
 
 # Installation Hailo-8L sur Raspberry Pi 5 see "https://www.raspberrypi.com/documentation/computers/ai.html"
-sudo apt install -y hailo-all
+sudo apt install -y hailo-all dkms hailo-tappas-core hailort python3-hailort

@@ -131,7 +131,7 @@ class TestVideoCaptureInit:
         assert model_path.exists(), f"Model path does not exist: {model_path}"
 
     def test_initial_flags(self, vc):
-        assert vc.enable_detection is True, "Detection should be enabled by default"
+        assert vc.enable_object_detection is True, "Detection should be enabled by default"
         assert vc.latest_frame is None or vc.latest_frame is not None
 
 
@@ -165,11 +165,11 @@ class TestVideoCaptureCapture:
         frame = _get_frame(vc)
         saved_results = vc.latest_results
         vc.latest_results = None
-        vc.enable_detection = False
+        vc.enable_object_detection = False
         vc.enable_face_detection = False
         result = vc.process_frame(frame)
         assert np.array_equal(result, frame), "With detection disabled, should return original frame content"
-        vc.enable_detection = True  # restore
+        vc.enable_object_detection = True  # restore
         vc.enable_face_detection = True  # restore
         vc.latest_results = saved_results
 
@@ -369,6 +369,52 @@ class TestVideoCaptureLifecycle:
 
 
 # ---------------------------------------------------------------------------
+# 8. Simultaneous Object Detection and Face Recognition
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+class TestSimultaneousVision:
+    """Test suite for simultaneous object detection and face recognition in VideoCapture."""
+
+    def test_simultaneous_processors_initialized(self, vc):
+        assert hasattr(vc, "object_processor")
+        assert hasattr(vc, "face_processor")
+        assert vc.enable_object_detection is True
+        assert vc.enable_face_detection is True
+
+    def test_simultaneous_processing_both_enabled(self, ready_vc, static_frame):
+        frame = _poll_frame(ready_vc) or static_frame
+        ready_vc.enable_object_detection = True
+        ready_vc.enable_face_detection = True
+        annotated = ready_vc.process_frame(frame)
+        assert annotated is not None
+        assert annotated.shape == frame.shape
+
+    def test_async_face_recognition_worker_lifecycle(self, cfg):
+        vc_async = VideoCapture(cfg)
+        assert vc_async.async_face_recognition is True
+        assert vc_async._recognition_executor is not None
+        vc_async.stop()
+        assert vc_async._recognition_executor is None
+
+    def test_compute_iou_helper(self):
+        from src.vision.video_capture import compute_iou
+
+        # Overlapping boxes
+        iou = compute_iou([10, 10, 50, 50], [10, 10, 50, 50])
+        assert abs(iou - 1.0) < 1e-4
+
+        # Disjoint boxes
+        iou_zero = compute_iou([0, 0, 10, 10], [50, 50, 60, 60])
+        assert iou_zero == 0.0
+
+        # Partial overlap
+        iou_partial = compute_iou([0, 0, 20, 20], [10, 0, 30, 20])
+        assert 0.0 < iou_partial < 1.0
+
+
+# ---------------------------------------------------------------------------
 # Direct execution support
 # ---------------------------------------------------------------------------
 
@@ -398,7 +444,7 @@ def _run_all_tests():
 
     check(vc.camera is not None, "camera is not None")
     check(vc.model is not None, "model is not None")
-    check(vc.enable_detection is True, "detection enabled by default")
+    check(vc.enable_object_detection is True, "detection enabled by default")
     check(vc.running is False, "not running before start()")
 
     frame = _poll_frame(vc) or _load_static_frame()
@@ -422,10 +468,10 @@ def _run_all_tests():
         check("preprocess" in speed, "speed has 'preprocess'")
         check("postprocess" in speed, "speed has 'postprocess'")
 
-    vc.enable_detection = False
+    vc.enable_object_detection = False
     raw = vc.process_frame(frame)
     check(raw is frame, "detection disabled → returns original frame")
-    vc.enable_detection = True
+    vc.enable_object_detection = True
 
     test_overlay = np.ones_like(frame) * 128
     original_overlay = test_overlay.copy()

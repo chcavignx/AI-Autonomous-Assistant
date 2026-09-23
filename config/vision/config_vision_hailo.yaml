@@ -1,0 +1,103 @@
+# ==============================================================================
+# Vision Profile: Hailo-8 / Hailo-8L M.2 AI HAT (NPU Acceleration)
+# ==============================================================================
+# Target: Raspberry Pi 5 with Hailo-8 / Hailo-8L M.2 AI module.
+#
+# Supported Models:
+#   Object Detection (HEF):
+#     - yolov8s_h8l.hef  (default, 640x640)
+#     - yolov8n.hef      (640x640)
+#     - yolo11n.hef      (640x640)
+#     - yolo26n.hef      (640x640)
+#     - ssd_mobilenet_v1.hef
+#     - detr_resnet_v1_18_bn.hef
+#   Face Detection (HEF):
+#     - scrfd_2.5g_h8l.hef (default, 640x640)
+#     - scrfd_2.5g.hef
+#   Face Recognition:
+#     - buffalo_l (ArcFace ONNX CPU post-processing)
+#     - arcface_mobilefacenet.hef (Hailo NPU embedding)
+# ==============================================================================
+
+# --- Object Detection Configuration ---
+object_model_type: "yolo_hailo"
+object_model_name: "yolo26n.hef"
+object_model_path: "/usr/share/hailo-models"
+object_label_path: null
+object_device: "hailo"
+object_inference_framework: "hef"
+object_nms: false
+object_image_size: 640
+object_recognition_threshold: 0.5
+enable_object_detection: true
+enable_object_recognition: true
+object_dataset_path: "data/object_dataset/"
+
+# --- Object Post-Processing ---
+object_post_processing_enabled: false
+object_post_processing_model_name: "buffalo_l"
+object_post_processing_model_type: "insightface"
+object_post_processing_model_path: null
+object_post_processing_image_size: 640
+object_post_processing_inference_framework: "onnx"
+
+# --- Face Detection Configuration ---
+face_detector_type: "hailo"
+face_model_name: "scrfd_2.5g_h8l.hef"
+face_model_path: "/usr/share/hailo-models"
+face_detector_device: "hailo"
+face_detector_inference_framework: "hef"
+face_recognition_threshold: 0.4
+enable_face_detection: true
+enable_face_recognition: true
+face_dataset_path: "data/face_dataset/"
+
+# --- Face Recognition & Embeddings (ArcFace Post-Processing) ---
+post_processing_enabled: true
+post_processing_model_name: "buffalo_l"
+post_processing_model_type: "insightface"
+post_processing_model_path: null
+post_processing_image_size: 640
+post_processing_inference_framework: "onnx"
+async_face_recognition: true
+face_recognition_interval: 1.5
+
+# --- Model Resolution Lookup Table ---
+model_resolutions:
+  "yolov8s_h8l.hef":
+    width: 640
+    height: 640
+  "yolov8n.hef":
+    width: 640
+    height: 640
+  "yolo11n.hef":
+    width: 640
+    height: 640
+  "yolo26n.hef":
+    width: 640
+    height: 640
+  "scrfd_2.5g_h8l.hef":
+    width: 640
+    height: 640
+  "scrfd_2.5g.hef":
+    width: 640
+    height: 640
+  "hailo":
+    width: 640
+    height: 640
+  "buffalo_l":
+    width: 640
+    height: 640
+  "default":
+    width: 1080
+    height: 720
+
+# --- Camera Configuration ---
+camera:
+  camera_index: 0
+  frame_width: 1080
+  frame_height: 720
+  format: "RGB888"
+  lores_frame_width: 640
+  lores_frame_height: 480
+  lores_format: "YUV420"

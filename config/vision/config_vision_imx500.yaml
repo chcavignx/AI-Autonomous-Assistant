@@ -1,0 +1,86 @@
+# ==============================================================================
+# Vision Profile: Sony IMX500 AI Camera (On-Sensor Neural Processing)
+# ==============================================================================
+# Target: Raspberry Pi AI Camera with Sony IMX500 intelligent vision sensor.
+#
+# Supported Models (RPK Firmware Packages):
+#   Object Detection:
+#     - /usr/share/imx500-models/imx500_network_ssd_mobilenetv2_fpnlite_320x320_pp.rpk
+#     - /usr/share/imx500-models/imx500_network_mobilenet_v2.rpk
+#     - /usr/share/imx500-models/imx500_network_regnety_004.rpk
+#   Face Detection:
+#     - /usr/share/imx500-models/imx500_network_mobilenet_v2.rpk
+#   Face Recognition:
+#     - buffalo_l (ArcFace ONNX CPU post-processing)
+# ==============================================================================
+
+# --- Object Detection Configuration ---
+object_model_type: "yolo_imx500"
+object_model_name: "imx500_network_ssd_mobilenetv2_fpnlite_320x320_pp.rpk"
+object_model_path: "/usr/share/imx500-models"
+object_label_path: null
+object_device: "imx500"
+object_inference_framework: "rpk"
+object_nms: false
+object_image_size: 640
+object_recognition_threshold: 0.5
+enable_object_detection: true
+enable_object_recognition: true
+object_dataset_path: "data/object_dataset/"
+
+# --- Object Post-Processing ---
+object_post_processing_enabled: true
+object_post_processing_model_name: "buffalo_l"
+object_post_processing_model_type: "insightface"
+object_post_processing_model_path: null
+object_post_processing_image_size: 640
+object_post_processing_inference_framework: "onnx"
+
+# --- Face Detection Configuration ---
+face_detector_type: "imx500"
+face_model_name: "imx500_network_mobilenet_v2.rpk"
+face_model_path: "/usr/share/imx500-models"
+face_detector_device: "imx500"
+face_detector_inference_framework: "rpk"
+face_recognition_threshold: 0.4
+enable_face_detection: true
+enable_face_recognition: true
+face_dataset_path: "data/face_dataset/"
+
+# --- Face Recognition & Embeddings (ArcFace Post-Processing) ---
+post_processing_enabled: true
+post_processing_model_name: "buffalo_l"
+post_processing_model_type: "insightface"
+post_processing_model_path: null
+post_processing_image_size: 640
+post_processing_inference_framework: "onnx"
+async_face_recognition: true
+face_recognition_interval: 1.5
+
+# --- Model Resolution Lookup Table ---
+model_resolutions:
+  "imx500":
+    width: 640
+    height: 480
+  "imx500_network_ssd_mobilenetv2_fpnlite_320x320_pp.rpk":
+    width: 640
+    height: 480
+  "imx500_network_mobilenet_v2.rpk":
+    width: 640
+    height: 480
+  "buffalo_l":
+    width: 640
+    height: 640
+  "default":
+    width: 1080
+    height: 720
+
+# --- Camera Configuration ---
+camera:
+  camera_index: 0
+  frame_width: 1080
+  frame_height: 720
+  format: "RGB888"
+  lores_frame_width: 640
+  lores_frame_height: 480
+  lores_format: "YUV420"

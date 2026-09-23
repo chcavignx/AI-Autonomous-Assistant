@@ -188,7 +188,9 @@ def test_vision_config_defaults() -> None:
 
 def test_vision_config_full_model_path_default() -> None:
     vision = config.VisionConfig()
-    expected = config.ROOT_DIR / ".cache" / "vision" / "models" / "yolo" / "yolo26n.onnx"
+    expected_device = config.ROOT_DIR / ".cache" / "vision" / "models" / "yolo" / "cpu" / "yolo26n.onnx"
+    expected_base = config.ROOT_DIR / ".cache" / "vision" / "models" / "yolo" / "yolo26n.onnx"
+    expected = expected_device if expected_device.exists() else expected_base
     assert vision.object_model_full_path == expected
 
 
@@ -312,3 +314,40 @@ def test_get_model_resolution() -> None:
 
     # Test default fallback for unknown model
     assert cfg.vision.get_model_resolution("unknown_model_xyz") == (1080, 720)
+
+
+def test_vision_config_face_model_paths() -> None:
+    vision = config.VisionConfig()
+    expected = config.ROOT_DIR / ".cache" / "vision" / "models" / "insightface" / "buffalo_l"
+    assert vision.face_detector_model_path == expected
+    assert vision.face_model_full_path == expected
+
+    # Absolute path
+    abs_path = "/usr/share/hailo-models/scrfd_2.5g.hef"
+    vision_abs = config.VisionConfig(face_model_path=abs_path)
+    assert vision_abs.face_detector_model_path == pathlib.Path(abs_path)
+    assert vision_abs.face_model_full_path == pathlib.Path(abs_path)
+
+
+def test_vision_config_dataset_paths(tmp_path: pathlib.Path) -> None:
+    vision = config.VisionConfig(
+        face_dataset_path="data/face_dataset",
+        object_dataset_path=str(tmp_path / "object_dataset"),
+    )
+    assert vision.face_dataset_full_path == config.ROOT_DIR / "data" / "face_dataset"
+    assert vision.object_dataset_full_path == tmp_path / "object_dataset"
+
+    vision_none = config.VisionConfig()
+    assert vision_none.face_dataset_full_path is None
+    assert vision_none.object_dataset_full_path is None
+
+
+def test_vision_config_alias_and_absolute_object_path() -> None:
+    vision = config.VisionConfig.model_validate(
+        {
+            "post_processing_model": "custom_buffalo",
+            "object_model_path": "/usr/share/hailo-models/yolov8s_h8l.hef",
+        }
+    )
+    assert vision.post_processing_model_name == "custom_buffalo"
+    assert vision.object_model_full_path == pathlib.Path("/usr/share/hailo-models/yolov8s_h8l.hef")

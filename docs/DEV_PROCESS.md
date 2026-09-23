@@ -83,7 +83,7 @@ Here is a prioritization proposed for the context: Raspberry Pi 5, Hailo-8L, NVM
         4-phase development roadmap comparing CPU baseline, Hailo-8L NPU, and Sony IMX500 smart camera performance.
 
 - **Module Integration**
-    1. Voice + Vision multimodal assistant orchestration (`src/vision/face_in_frame.py` + `src/audio/asr.py` + `src/audio/tts.py`).
+    1. Voice + Vision multimodal assistant orchestration (`src/vision/face_insight_frame.py` + `src/audio/asr.py` + `src/audio/tts.py`).
 
 - **Design Decision**
   1. Voice Agent Solution and Architecture: [Voice Agent Offline Solution](STS_VAD_MODELS.md)

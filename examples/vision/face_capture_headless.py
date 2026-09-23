@@ -22,9 +22,6 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from src.utils.config import load_config
-from src.vision.face_detector_cascade import CascadeFaceDetector
-from src.vision.yolo_cpu import YoloCpuDetector
-from src.vision.face_detector import InsightFaceDetector
 
 GEN_DATA_DIR  =  str(project_root / "data")
 OUTPUT_DIR = "face_dataset"
@@ -74,7 +71,7 @@ class HeadlessFaceCapture:
         self.current_camera = None
         self.current_person_name = "unknown"
         self.capture_count = 0
-        self.output_dir = output_dir
+        self.output_dir = str(self.cfg.vision.face_dataset_full_path or output_dir)
         self.running = False
         self.auto_capture_mode = False
         self.auto_capture_interval = getattr(self.cfg.vision, "auto_capture_interval", 2.0)  # seconds
@@ -82,18 +79,29 @@ class HeadlessFaceCapture:
         self.margin = getattr(self.cfg.vision, "face_capture_margin", 20)
 
         # Initialize configured modular face detector
+        from src.vision.face_insight_frame import FaceInsightFrame
         detector_type = getattr(self.cfg.vision, "face_detector_type", "cascade")
-        if detector_type == "cascade":
-            self.face_detector = CascadeFaceDetector(self.cfg)
-        elif detector_type == "yolo":
-            self.face_detector = YoloCpuDetector(self.cfg)
-        elif detector_type == "insightface":
-            self.face_detector = InsightFaceDetector(self.cfg)
-        else:
-            self.face_detector = CascadeFaceDetector(self.cfg)
+        self.face_processor = FaceInsightFrame(self.cfg, detector_type=detector_type)
+        self.face_detector = self.face_processor.detector
 
         os.makedirs(self.output_dir, exist_ok=True)
         self.initialize_cameras()
+
+    def stop(self) -> None:
+        """Stop camera and release processor resources."""
+        self.running = False
+        if self.current_camera and self.current_camera.get("camera"):
+            try:
+                self.current_camera["camera"].stop()
+                self.current_camera["camera"].close()
+            except Exception:
+                pass
+        if hasattr(self, "face_processor") and hasattr(self.face_processor, "stop"):
+            try:
+                self.face_processor.stop()
+            except Exception:
+                pass
+
 
     def initialize_cameras(self):
         """Initialize available cameras with fallback to standard USB webcams"""

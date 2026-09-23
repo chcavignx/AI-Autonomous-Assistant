@@ -80,6 +80,8 @@ def test_threaded_camera_read_none() -> None:
         assert threaded_cam.read() == (None, None)
 
 
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
+@pytest.mark.filterwarnings("ignore::ResourceWarning")
 def test_pi_camera_wrapper() -> None:
     """Test PiCamera class wrappers around Picamera2."""
     mock_picam = MagicMock()
@@ -158,3 +160,49 @@ def test_is_imx500_camera_exception() -> None:
     """Test is_imx500_camera returns False on import or camera error."""
     with patch.dict("sys.modules", {"picamera2": None}):
         assert camera.is_imx500_camera() is False
+
+
+def test_threaded_camera_picamera2_standard() -> None:
+    """Test ThreadedCamera lifecycle when using standard Picamera2."""
+    mock_picam = MagicMock()
+    mock_req = MagicMock()
+    mock_req.make_array.return_value = np.ones((480, 640, 3), dtype=np.uint8)
+    mock_req.get_metadata.return_value = {"ExposureTime": 1000}
+    mock_picam.capture_request.return_value = mock_req
+
+    cfg = Config()
+    cfg.vision.object_model_type = "yolo_hailo"
+    cfg.vision.camera.camera_index = 0
+
+    with (
+        patch.dict("sys.modules", {"picamera2": MagicMock(Picamera2=MagicMock(return_value=mock_picam))}),
+        patch("importlib.util.find_spec", return_value=True),
+    ):
+        threaded_cam = camera.ThreadedCamera(cfg)
+        threaded_cam.started = False
+        if threaded_cam.thread:
+            threaded_cam.thread.join(timeout=1.0)
+
+        assert threaded_cam.use_picamera2 is True
+        assert threaded_cam.grabbed is True
+        assert threaded_cam.frame is not None
+
+        frame, metadata = threaded_cam.read()
+        assert frame is not None
+        assert metadata == {"ExposureTime": 1000}
+
+        threaded_cam.stop()
+        mock_picam.stop.assert_called_once()
+        mock_picam.close.assert_called_once()
+
+
+def test_pi_camera_close() -> None:
+    """Test PiCamera.close cleanly stops and closes the underlying Picamera2."""
+    mock_picam = MagicMock()
+    mock_picam.camera_info = "Mock Pi Camera 2"
+
+    with patch.dict("sys.modules", {"picamera2": MagicMock(Picamera2=MagicMock(return_value=mock_picam))}):
+        pi_cam = camera.PiCamera(index=0)
+        pi_cam.close()
+        mock_picam.stop.assert_called_once()
+        mock_picam.close.assert_called_once()
