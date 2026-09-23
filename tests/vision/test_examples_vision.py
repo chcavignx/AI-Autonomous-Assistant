@@ -167,6 +167,9 @@ def test_simultaneous_vision_e2e_automated():
     """Test simultaneous vision CLI end-to-end automated test suite."""
     from examples.vision.simultaneous_face_object_e2e import run_automated_test
 
+    mock_cam = MagicMock()
+    mock_cam.read.return_value = (np.zeros((480, 640, 3), dtype=np.uint8), {})
+
     mock_obj = MagicMock()
     mock_obj.process_frame.side_effect = lambda frame, *args, **kwargs: (frame, [])
     mock_face = MagicMock()
@@ -176,7 +179,7 @@ def test_simultaneous_vision_e2e_automated():
     mock_face.face_recognizer = MagicMock()
 
     with (
-        patch("examples.vision.simultaneous_face_object_e2e.discover_pi_cameras", return_value=[]),
+        patch("src.vision.video_capture.ThreadedCamera", return_value=mock_cam),
         patch("src.vision.video_capture.VideoCapture._init_object_processor", return_value=mock_obj),
         patch("src.vision.video_capture.VideoCapture._init_face_processor", return_value=mock_face),
     ):
@@ -185,7 +188,10 @@ def test_simultaneous_vision_e2e_automated():
 
 def test_simultaneous_vision_web_automated():
     """Test simultaneous vision Web Flask endpoints and streaming automated test."""
-    from examples.vision.simultaneous_vision_web import run_automated_web_test
+    import examples.vision.simultaneous_vision_web as sim_web
+
+    mock_cam = MagicMock()
+    mock_cam.read.return_value = (np.zeros((480, 640, 3), dtype=np.uint8), {})
 
     mock_obj = MagicMock()
     mock_obj.process_frame.side_effect = lambda frame, *args, **kwargs: (frame, [])
@@ -195,9 +201,10 @@ def test_simultaneous_vision_web_automated():
     mock_face.detector.detect.return_value = []
     mock_face.face_recognizer = MagicMock()
 
+    sim_web._vision_tool_instance = None
     with (
-        patch("examples.vision.simultaneous_vision_web.discover_pi_cameras", return_value=[]),
+        patch("src.vision.video_capture.ThreadedCamera", return_value=mock_cam),
         patch("src.vision.video_capture.VideoCapture._init_object_processor", return_value=mock_obj),
         patch("src.vision.video_capture.VideoCapture._init_face_processor", return_value=mock_face),
     ):
-        assert run_automated_web_test() is True
+        assert sim_web.run_automated_web_test() is True

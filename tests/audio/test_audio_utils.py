@@ -590,6 +590,7 @@ def test_base_stream_close_and_read_error_paths(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_create_stream_factories(monkeypatch: pytest.MonkeyPatch) -> None:
+    install_sounddevice_module(monkeypatch)
     assert isinstance(audio_utils.create_input_stream(16000, 320), audio_utils.SoundDeviceInputStream)
     assert isinstance(audio_utils.create_output_stream(16000, 320), audio_utils.SoundDeviceOutputStream)
 
@@ -721,6 +722,8 @@ def test_audio_player_play_wav_bytes_error_paths(monkeypatch: pytest.MonkeyPatch
 
 
 def test_audio_recorder_start_read_and_close(monkeypatch: pytest.MonkeyPatch) -> None:
+    install_sounddevice_module(monkeypatch)
+
     class DummyInputStream:
         def __init__(self) -> None:
             self.active = False
@@ -771,6 +774,8 @@ def test_audio_recorder_start_read_and_close(monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_audio_recorder_error_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    install_sounddevice_module(monkeypatch)
+
     class ExplodingStream:
         active = True
 
@@ -795,6 +800,8 @@ def test_legacy_wrappers_cover_module_helpers() -> None:
 
 def test_additional_backend_and_device_error_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     original_import = builtins.__import__
+
+    monkeypatch.delitem(sys.modules, "sounddevice", raising=False)
 
     def import_missing_sounddevice(name: str, *args: Any, **kwargs: Any):
         if name == "sounddevice":
@@ -825,6 +832,7 @@ def test_additional_backend_and_device_error_paths(monkeypatch: pytest.MonkeyPat
 
 
 def test_additional_resample_stream_and_factory_error_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    install_sounddevice_module(monkeypatch)
     audio = np.array([0.0, 1.0, 0.0, -1.0], dtype=np.float32)
     original_import = builtins.__import__
 

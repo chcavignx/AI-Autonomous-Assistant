@@ -85,7 +85,7 @@ def get_audio_backend() -> str:
     try:
         import sounddevice
         _ = sounddevice
-    except ImportError as e:
+    except (ImportError, OSError) as e:
         raise ImportError("The 'sounddevice' library is required") from e
     return "sounddevice"
 
